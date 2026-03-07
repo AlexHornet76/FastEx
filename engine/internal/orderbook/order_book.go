@@ -128,3 +128,29 @@ func (ob *OrderBook) IsEmpty() bool {
 
 	return ob.buySide.IsEmpty() && ob.sellSide.IsEmpty()
 }
+
+// ProcessOrder matches an order and adds any remaining quantity to the book
+// Returns the match result
+func (ob *OrderBook) ProcessOrder(order *models.Order) (*MatchResult, error) {
+	if order.Instrument != ob.instrument {
+		return nil, fmt.Errorf("instrument mismatch")
+	}
+
+	result := ob.MatchOrder(order)
+
+	// If not fully filled, add remaining to book
+	if !result.FullyFilled && result.RemainingQty > 0 {
+		order.Status = models.Open
+		if order.FilledQty > 0 {
+			order.Status = models.Partial
+		}
+
+		if err := ob.AddOrder(order); err != nil {
+			return result, fmt.Errorf("failed to add order to book: %w", err)
+		}
+	} else {
+		order.Status = models.Filled
+	}
+
+	return result, nil
+}

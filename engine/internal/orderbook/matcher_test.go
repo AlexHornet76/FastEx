@@ -357,3 +357,59 @@ func TestMatchOrder_SellOrderMatchesBuyBook(t *testing.T) {
 		t.Errorf("Sell order should be fully filled")
 	}
 }
+
+func TestProcessOrder_PartialMatchThenRest(t *testing.T) {
+	ob := NewOrderBook("BTC-USD")
+
+	// Add small SELL order
+	sellOrder := &models.Order{
+		OrderID: uuid.New(), UserID: uuid.New(),
+		Instrument: "BTC-USD", Side: models.Sell,
+		Price: 5010000, Quantity: 100, Status: models.Open,
+		Timestamp: time.Now(),
+	}
+	ob.AddOrder(sellOrder)
+
+	// Incoming large BUY order
+	buyOrder := &models.Order{
+		OrderID: uuid.New(), UserID: uuid.New(),
+		Instrument: "BTC-USD", Side: models.Buy,
+		Price: 5020000, Quantity: 500, // Much larger
+		Status: models.New, Timestamp: time.Now(),
+	}
+
+	result, err := ob.ProcessOrder(buyOrder)
+	if err != nil {
+		t.Fatalf("ProcessOrder failed: %v", err)
+	}
+
+	// Should have 1 trade (100 filled)
+	if len(result.Trades) != 1 {
+		t.Errorf("Expected 1 trade, got %d", len(result.Trades))
+	}
+
+	// Should have 400 remaining in book
+	if result.RemainingQty != 400 {
+		t.Errorf("Expected 400 remaining, got %d", result.RemainingQty)
+	}
+
+	// Buy order should be in book now
+	orderInBook, exists := ob.GetOrder(buyOrder.OrderID)
+	if !exists {
+		t.Fatal("Buy order should be in book")
+	}
+
+	if orderInBook.FilledQty != 100 {
+		t.Errorf("Buy order should have 100 filled, got %d", orderInBook.FilledQty)
+	}
+
+	if orderInBook.Status != models.Partial {
+		t.Errorf("Buy order status should be PARTIAL, got %s", orderInBook.Status)
+	}
+
+	// Should be best bid now
+	bestBid, exists := ob.BestBid()
+	if !exists || bestBid != 5020000 {
+		t.Errorf("Buy order should be best bid at 5020000")
+	}
+}
