@@ -174,7 +174,7 @@ func TestWAL_MultipleEntryTypes(t *testing.T) {
 	wal.Append(entry2)
 
 	// Order cancelled
-	entry3, _ := NewOrderCancelledEntry(0, order.OrderID, "BTC-USD", 5000000)
+	entry3, _ := NewOrderCanceledEntry(0, order.OrderID, "BTC-USD", 5000000)
 	wal.Append(entry3)
 
 	wal.Close()

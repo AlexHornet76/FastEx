@@ -72,8 +72,8 @@ func NewTradeExecutedEntry(seqNum uint64, trade *models.Trade) (*Entry, error) {
 	}, nil
 }
 
-// NewOrderCancelledEntry creates a WAL entry for order cancellation
-func NewOrderCancelledEntry(seqNum uint64, orderID uuid.UUID, instrument string, price int64) (*Entry, error) {
+// NewOrderCanceledEntry creates a WAL entry for order cancellation
+func NewOrderCanceledEntry(seqNum uint64, orderID uuid.UUID, instrument string, price int64) (*Entry, error) {
 	data, err := json.Marshal(OrderCanceledData{
 		OrderID:    orderID,
 		Instrument: instrument,
@@ -110,8 +110,8 @@ func (e *Entry) ParseTradeExecutedData() (*TradeExecutedData, error) {
 	return &data, nil
 }
 
-// ParseOrderCancelledData extracts cancellation info from entry
-func (e *Entry) ParseOrderCancelledData() (*OrderCanceledData, error) {
+// ParseOrderCanceledData extracts cancellation info from entry
+func (e *Entry) ParseOrderCanceledData() (*OrderCanceledData, error) {
 	var data OrderCanceledData
 	if err := json.Unmarshal(e.Data, &data); err != nil {
 		return nil, err

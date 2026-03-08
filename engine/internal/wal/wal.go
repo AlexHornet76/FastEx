@@ -175,3 +175,8 @@ func (w *WAL) Truncate() error {
 	atomic.StoreUint64(&w.sequenceNum, 0)
 	return err
 }
+
+// FilePath returns the path to the WAL file
+func (w *WAL) FilePath() string {
+	return w.filePath
+}
