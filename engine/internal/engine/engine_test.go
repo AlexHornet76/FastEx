@@ -131,6 +131,6 @@ func TestEngine_CancelOrder(t *testing.T) {
 	// Order should be removed
 	_, exists := engine.GetOrderBook().GetOrder(order.OrderID)
 	if exists {
-		t.Errorf("Cancelled order should not be in book")
+		t.Errorf("Canceled order should not be in book")
 	}
 }

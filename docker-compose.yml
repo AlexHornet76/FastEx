@@ -3,7 +3,7 @@ version: '3.9'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: exchange-postgres
+    container_name: postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-exchangeuser}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepassword}
@@ -26,7 +26,7 @@ services:
     build:
       context: ./gateway
       dockerfile: Dockerfile
-    container_name: exchange-gateway
+    container_name: gateway
     ports:
       - "8080:8080"
     environment:
@@ -53,10 +53,33 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+  
+  engine:  
+    build:
+      context: ./engine
+      dockerfile: Dockerfile
+    container_name: engine
+    ports:
+      - "8081:8081"
+    environment:
+      MATCHING_ENGINE_PORT: "8081"
+      INSTRUMENTS: "BTC,AAPL,GOOGL,EETH"
+      WAL_DIR: "/app/data/wal"
+      LOG_LEVEL: info
+    volumes:
+      - engine_data:/app/data
+    networks:
+      - fastex
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_data:
-    driver: local
+  engine_data:
 
 networks:
   fastex:
