@@ -185,8 +185,25 @@ func (h *OrderHandler) GetOrderBook(w http.ResponseWriter, r *http.Request) {
 	response.BidDepth = bidDepth
 	response.AskDepth = askDepth
 
-	// TODO: top 10 price levels (requires exposing price levels from order book)
-	// For now, just aggregated info
+	bidLevels := ob.GetTopBids(10)
+	askLevels := ob.GetTopAsks(10)
+
+	// Convert orderbook.PriceLevelInfo to handlers.PriceLevelInfo
+	for _, level := range bidLevels {
+		response.Bids = append(response.Bids, PriceLevelInfo{
+			Price:      level.Price,
+			Quantity:   level.Quantity,
+			OrderCount: level.OrderCount,
+		})
+	}
+
+	for _, level := range askLevels {
+		response.Asks = append(response.Asks, PriceLevelInfo{
+			Price:      level.Price,
+			Quantity:   level.Quantity,
+			OrderCount: level.OrderCount,
+		})
+	}
 
 	respondJSON(w, http.StatusOK, response)
 }

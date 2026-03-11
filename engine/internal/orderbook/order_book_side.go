@@ -25,8 +25,15 @@ func NewOrderBookSide(side models.OrderSide) *OrderBookSide {
 	}
 }
 
+type PriceLevelInfo struct {
+	Price      int64 `json:"price"`
+	Quantity   int64 `json:"quantity"`
+	OrderCount int   `json:"order_count"`
+}
+
 // AddOrder adds an order to the appropriate price level
 func (obs *OrderBookSide) AddOrder(order *models.Order) {
+
 	price := order.Price
 
 	// Get or create price level
@@ -43,6 +50,7 @@ func (obs *OrderBookSide) AddOrder(order *models.Order) {
 
 // RemoveOrder removes an order from its price level
 func (obs *OrderBookSide) RemoveOrder(orderID uuid.UUID, price int64) *models.Order {
+
 	priceLevel, exists := obs.priceLevels[price]
 	if !exists {
 		return nil
@@ -88,11 +96,13 @@ func (obs *OrderBookSide) BestPrice() (int64, bool) {
 
 // GetPriceLevel returns the price level at a given price
 func (obs *OrderBookSide) GetPriceLevel(price int64) *PriceLevel {
+
 	return obs.priceLevels[price]
 }
 
 // ensureSorted sorts prices if needed
 func (obs *OrderBookSide) ensureSorted() {
+
 	if obs.isSorted {
 		return
 	}
@@ -106,6 +116,7 @@ func (obs *OrderBookSide) ensureSorted() {
 
 // IsEmpty returns true if no orders on this side
 func (obs *OrderBookSide) IsEmpty() bool {
+
 	return len(obs.priceLevels) == 0
 }
 
@@ -116,9 +127,48 @@ func (obs *OrderBookSide) Depth() int {
 
 // TotalQuantity returns sum of all quantities on this side
 func (obs *OrderBookSide) TotalQuantity() int64 {
+
 	var total int64
 	for _, pl := range obs.priceLevels {
 		total += pl.TotalQuantity()
 	}
 	return total
+}
+
+// GetTopPriceLevels returns top N price levels with aggregated info
+func (obs *OrderBookSide) GetTopPriceLevels(limit int) []PriceLevelInfo {
+
+	obs.ensureSorted()
+
+	result := make([]PriceLevelInfo, 0, limit)
+	count := 0
+
+	// Get prices in correct order
+	var prices []int64
+	if obs.side == models.Buy {
+		// Buy side: highest first (reverse iteration)
+		for i := len(obs.prices) - 1; i >= 0 && count < limit; i-- {
+			prices = append(prices, obs.prices[i])
+		}
+	} else {
+		// Sell side: lowest first (forward iteration)
+		for i := 0; i < len(obs.prices) && count < limit; i++ {
+			prices = append(prices, obs.prices[i])
+		}
+	}
+
+	// Build price level info
+	for _, price := range prices {
+		priceLevel := obs.priceLevels[price]
+		if priceLevel != nil && !priceLevel.IsEmpty() {
+			result = append(result, PriceLevelInfo{
+				Price:      price,
+				Quantity:   priceLevel.TotalQuantity(),
+				OrderCount: priceLevel.Len(),
+			})
+			count++
+		}
+	}
+
+	return result
 }

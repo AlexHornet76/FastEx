@@ -154,3 +154,19 @@ func (ob *OrderBook) ProcessOrder(order *models.Order) (*MatchResult, error) {
 
 	return result, nil
 }
+
+// GetTopBids returns top N bid levels
+func (ob *OrderBook) GetTopBids(limit int) []PriceLevelInfo {
+	ob.mu.RLock()
+	defer ob.mu.RUnlock()
+
+	return ob.buySide.GetTopPriceLevels(limit)
+}
+
+// GetTopAsks returns top N ask levels
+func (ob *OrderBook) GetTopAsks(limit int) []PriceLevelInfo {
+	ob.mu.RLock()
+	defer ob.mu.RUnlock()
+
+	return ob.sellSide.GetTopPriceLevels(limit)
+}
