@@ -13,6 +13,7 @@ import (
 	"github.com/AlexHornet76/FastEx/engine/internal/config"
 	"github.com/AlexHornet76/FastEx/engine/internal/engine"
 	"github.com/AlexHornet76/FastEx/engine/internal/handlers"
+	"github.com/AlexHornet76/FastEx/engine/internal/kafka"
 	"github.com/AlexHornet76/FastEx/engine/internal/logger"
 )
 
@@ -28,11 +29,26 @@ func main() {
 	logger.Init(cfg.LogLevel)
 	slog.Info("starting matching engine service", "version", "sprint-2")
 
+	//Kafka producer
+	var producer *kafka.Producer
+	if cfg.KafkaEnabled {
+		p, err := kafka.NewProducer(cfg.KafkaBrokers)
+		if err != nil {
+			slog.Error("failed to initialize Kafka producer", "error", err)
+			os.Exit(1)
+		}
+		producer = p
+		slog.Info("Kafka producer initialized", "brokers", cfg.KafkaBrokers)
+		defer producer.Close()
+	} else {
+		slog.Info("Kafka producer disabled")
+	}
+
 	//Init engines
 	engines := make(map[string]*engine.Engine)
 
 	for _, instrument := range cfg.Instruments {
-		eng, err := engine.NewEngine(instrument, cfg.WALDir)
+		eng, err := engine.NewEngine(instrument, cfg.WALDir, producer)
 		if err != nil {
 			slog.Error("failed to initialize engine", "instrument", instrument, "error", err)
 			os.Exit(1)

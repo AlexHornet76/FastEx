@@ -2,17 +2,18 @@ package config
 
 import (
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Port        string
-	WALDir      string
-	Instruments []string
-	LogLevel    string
+	Port         string
+	WALDir       string
+	Instruments  []string
+	LogLevel     string
+	KafkaBrokers []string
+	KafkaEnabled bool
 }
 
 // Load reads configuration from environment variables
@@ -27,6 +28,9 @@ func Load() (*Config, error) {
 	instruments := getEnv("INSTRUMENTS", "")
 	cfg.Instruments = parseInstruments(instruments)
 
+	cfg.KafkaEnabled = strings.ToLower(getEnv("KAFKA_ENABLED", "false")) == "true"
+	cfg.KafkaBrokers = parseCSV(getEnv("KAFKA_BROKERS", ""))
+
 	return cfg, nil
 }
 
@@ -37,18 +41,25 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-func getEnvInt(key string, defaultValue int) int {
-	if value := os.Getenv(key); value != "" {
-		if intVal, err := strconv.Atoi(value); err == nil {
-			return intVal
-		}
-	}
-	return defaultValue
-}
-
 func parseInstruments(instruments string) []string {
 	if instruments == "" {
 		return []string{}
 	}
 	return strings.Split(instruments, ",")
+}
+
+func parseCSV(v string) []string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return nil
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

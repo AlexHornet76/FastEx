@@ -1,9 +1,12 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
+	"github.com/AlexHornet76/FastEx/engine/internal/kafka"
 	"github.com/AlexHornet76/FastEx/engine/internal/models"
 	"github.com/AlexHornet76/FastEx/engine/internal/orderbook"
 	"github.com/AlexHornet76/FastEx/engine/internal/wal"
@@ -14,9 +17,10 @@ type Engine struct {
 	instrument string
 	orderbook  *orderbook.OrderBook
 	wal        *wal.WAL
+	producer   *kafka.Producer
 }
 
-func NewEngine(instrument string, walDir string) (*Engine, error) {
+func NewEngine(instrument string, walDir string, producer *kafka.Producer) (*Engine, error) {
 	// Open WAL
 	w, err := wal.Open(walDir, fmt.Sprintf("%s.wal", instrument))
 	if err != nil {
@@ -27,6 +31,7 @@ func NewEngine(instrument string, walDir string) (*Engine, error) {
 		instrument: instrument,
 		orderbook:  orderbook.NewOrderBook(instrument),
 		wal:        w,
+		producer:   producer,
 	}
 
 	// Recover from WAL if exists
@@ -137,6 +142,8 @@ func (e *Engine) ProcessOrder(order *models.Order) (*orderbook.MatchResult, erro
 		"instrument", order.Instrument,
 		"seq", entry.SequenceNum)
 
+	e.publishOrderPlaced(order)
+
 	// Step 2: Match in-memory
 	result := e.orderbook.MatchOrder(order)
 
@@ -154,6 +161,7 @@ func (e *Engine) ProcessOrder(order *models.Order) (*orderbook.MatchResult, erro
 			"qty", trade.Quantity,
 			"price", trade.Price,
 			"seq", tradeEntry.SequenceNum)
+		e.publishTradeExecuted(trade)
 	}
 
 	// Step 4: Add remaining to book (if any)
@@ -190,8 +198,74 @@ func (e *Engine) CancelOrder(orderID uuid.UUID, price int64) error {
 		return fmt.Errorf("remove order: %w", err)
 	}
 
+	e.publishOrderCanceled(orderID, price)
 	slog.Info("order canceled", "order_id", orderID)
 	return nil
+}
+
+func (e *Engine) publishOrderPlaced(order *models.Order) {
+	if e.producer == nil {
+		return
+	}
+
+	ev := kafka.OrderPlacedEvent{
+		EventType:  kafka.TopicOrderPlaced,
+		EventTime:  time.Now().UTC(),
+		Instrument: order.Instrument,
+		OrderID:    order.OrderID,
+		UserID:     order.UserID,
+		Side:       string(order.Side),
+		Type:       string(order.Type),
+		Price:      order.Price,
+		Quantity:   order.Quantity,
+		FilledQty:  order.FilledQty,
+		Status:     string(order.Status),
+	}
+
+	if err := e.producer.PublishJSON(context.Background(), kafka.TopicOrderPlaced, order.Instrument, ev); err != nil {
+		slog.Warn("kafka publish failed", "topic", kafka.TopicOrderPlaced, "instrument", order.Instrument, "error", err)
+	}
+}
+
+func (e *Engine) publishTradeExecuted(trade *models.Trade) {
+	if e.producer == nil {
+		return
+	}
+
+	ev := kafka.TradeExecutedEvent{
+		EventType:    kafka.TopicTradeExecuted,
+		EventTime:    time.Now().UTC(),
+		Instrument:   trade.Instrument,
+		TradeID:      trade.TradeID,
+		BuyOrderID:   trade.BuyOrderID,
+		SellOrderID:  trade.SellOrderID,
+		BuyerUserID:  trade.BuyerUserID,
+		SellerUserID: trade.SellerUserID,
+		Price:        trade.Price,
+		Quantity:     trade.Quantity,
+	}
+
+	if err := e.producer.PublishJSON(context.Background(), kafka.TopicTradeExecuted, trade.Instrument, ev); err != nil {
+		slog.Warn("kafka publish failed", "topic", kafka.TopicTradeExecuted, "instrument", trade.Instrument, "error", err)
+	}
+}
+
+func (e *Engine) publishOrderCanceled(orderID uuid.UUID, price int64) {
+	if e.producer == nil {
+		return
+	}
+
+	ev := kafka.OrderCanceledEvent{
+		EventType:  kafka.TopicOrderCanceled,
+		EventTime:  time.Now().UTC(),
+		Instrument: e.instrument,
+		OrderID:    orderID,
+		Price:      price,
+	}
+
+	if err := e.producer.PublishJSON(context.Background(), kafka.TopicOrderCanceled, e.instrument, ev); err != nil {
+		slog.Warn("kafka publish failed", "topic", kafka.TopicOrderCanceled, "instrument", e.instrument, "error", err)
+	}
 }
 
 // GetOrderBook returns the order book (for queries)
