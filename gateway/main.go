@@ -15,6 +15,7 @@ import (
 	"github.com/AlexHornet76/FastEx/gateway/internal/database"
 	"github.com/AlexHornet76/FastEx/gateway/internal/handlers"
 	"github.com/AlexHornet76/FastEx/gateway/internal/logger"
+	"github.com/AlexHornet76/FastEx/gateway/internal/matching"
 	"github.com/gorilla/websocket"
 )
 
@@ -50,6 +51,17 @@ func main() {
 	// Start background challenge cleanup
 	go database.CleanupExpiredChallenges(ctx, db)
 
+	// Initialize matching engine client
+	matchingClient := matching.NewClient(cfg.MatchingEngineURL)
+	slog.Info("matching engine client initialized", "url", cfg.MatchingEngineURL)
+
+	// Check matching engine health
+	if err := matchingClient.HealthCheck(); err != nil {
+		slog.Warn("matching engine health check failed (will retry on requests)", "error", err)
+	} else {
+		slog.Info("matching engine health check passed")
+	}
+
 	// Initialize WebSocket upgrader
 	upgrader := &websocket.Upgrader{
 		ReadBufferSize:  1024,
@@ -60,6 +72,7 @@ func main() {
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	wsHandler := handlers.NewWebSocketHandler(upgrader, cfg.JWTSecret)
+	orderHandler := handlers.NewOrderHandler(matchingClient)
 
 	// Setup routes
 	mux := http.NewServeMux()
@@ -74,8 +87,19 @@ func main() {
 	mux.HandleFunc("/ws", wsHandler.HandleConnection)
 
 	// Protected routes (example)
-	mux.Handle("/api/user/profile", auth.JWTMiddleware(cfg.JWTSecret)(
+	mux.Handle("GET /api/user/profile", auth.JWTMiddleware(cfg.JWTSecret)(
 		http.HandlerFunc(authHandler.GetProfile),
+	))
+
+	// Order routes
+	mux.Handle("POST /api/orders", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(orderHandler.SubmitOrder),
+	))
+	mux.Handle("DELETE /api/orders/{id}", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(orderHandler.CancelOrder),
+	))
+	mux.Handle("GET /api/orderbook/{instrument}", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(orderHandler.GetOrderBook),
 	))
 
 	// Apply CORS middleware

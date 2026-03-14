@@ -42,6 +42,7 @@ services:
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CHALLENGE_TTL_MINUTES: ${CHALLENGE_TTL_MINUTES:-5}
+      MATCHING_ENGINE_URL: ${MATCHING_ENGINE_URL:-http://engine:8081}
     depends_on:
       postgres:
         condition: service_healthy

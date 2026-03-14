@@ -22,6 +22,7 @@ type Config struct {
 	CORSAllowedOrigins  []string
 	LogLevel            string
 	ChallengeTTLMinutes int
+	MatchingEngineURL   string
 }
 
 // Load reads configuration from environment variables
@@ -42,6 +43,7 @@ func Load() (*Config, error) {
 		CORSAllowedOrigins:  strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000"), ","),
 		LogLevel:            getEnv("LOG_LEVEL", "info"),
 		ChallengeTTLMinutes: getEnvInt("CHALLENGE_TTL_MINUTES", 5),
+		MatchingEngineURL:   getEnv("MATCHING_ENGINE_URL", "http://localhost:8081"),
 	}
 
 	// Validate JWT secret
