@@ -18,18 +18,18 @@ import (
 )
 
 func main() {
-	//Load config
+	// Load config
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
 
-	//Init logger
+	// Init logger
 	logger.Init(cfg.LogLevel)
-	slog.Info("starting matching engine service", "version", "sprint-2")
+	slog.Info("starting matching engine service", "version", "sprint-3.6")
 
-	//Kafka producer
+	// Kafka producer (used ONLY by WAL publisher)
 	var producer *kafka.Producer
 	if cfg.KafkaEnabled {
 		p, err := kafka.NewProducer(cfg.KafkaBrokers)
@@ -44,17 +44,27 @@ func main() {
 		slog.Info("Kafka producer disabled")
 	}
 
-	//Init engines
+	// Init engines (NO kafka producer passed)
 	engines := make(map[string]*engine.Engine)
-
 	for _, instrument := range cfg.Instruments {
-		eng, err := engine.NewEngine(instrument, cfg.WALDir, producer)
+		eng, err := engine.NewEngine(instrument, cfg.WALDir)
 		if err != nil {
 			slog.Error("failed to initialize engine", "instrument", instrument, "error", err)
 			os.Exit(1)
 		}
 		engines[instrument] = eng
 		slog.Info("engine initialized", "instrument", instrument)
+	}
+
+	// Start WAL publishers
+	if producer != nil {
+		pubCtx, pubCancel := context.WithCancel(context.Background())
+		defer pubCancel()
+
+		for _, instrument := range cfg.Instruments {
+			wp := kafka.NewWALPublisher(producer, cfg.WALDir, instrument)
+			go wp.Run(pubCtx)
+		}
 	}
 
 	// Initialize handlers

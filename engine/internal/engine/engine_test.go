@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AlexHornet76/FastEx/engine/internal/kafka"
 	"github.com/AlexHornet76/FastEx/engine/internal/models"
 	"github.com/google/uuid"
 )
@@ -12,8 +11,7 @@ import (
 func TestEngine_ProcessOrder(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	producer, _ := kafka.NewProducer([]string{"localhost:9092"})
-	engine, err := NewEngine("BTC-USD", tmpDir, producer)
+	engine, err := NewEngine("BTC-USD", tmpDir)
 	if err != nil {
 		t.Fatalf("Failed to create engine: %v", err)
 	}
@@ -71,8 +69,7 @@ func TestEngine_Recovery(t *testing.T) {
 
 	// Create engine and place orders
 	{
-		producer, _ := kafka.NewProducer([]string{"localhost:9092"})
-		engine, _ := NewEngine("BTC-USD", tmpDir, producer)
+		engine, _ := NewEngine("BTC-USD", tmpDir)
 
 		order := &models.Order{
 			OrderID:    uuid.New(),
@@ -90,8 +87,7 @@ func TestEngine_Recovery(t *testing.T) {
 
 	// Restart and verify recovery
 	{
-		producer, _ := kafka.NewProducer([]string{"localhost:9092"})
-		engine, err := NewEngine("BTC-USD", tmpDir, producer)
+		engine, err := NewEngine("BTC-USD", tmpDir)
 		if err != nil {
 			t.Fatalf("Failed to recover: %v", err)
 		}
@@ -111,8 +107,7 @@ func TestEngine_Recovery(t *testing.T) {
 
 func TestEngine_CancelOrder(t *testing.T) {
 	tmpDir := t.TempDir()
-	producer, _ := kafka.NewProducer([]string{"localhost:9092"})
-	engine, _ := NewEngine("BTC-USD", tmpDir, producer)
+	engine, _ := NewEngine("BTC-USD", tmpDir)
 	defer engine.Close()
 
 	order := &models.Order{

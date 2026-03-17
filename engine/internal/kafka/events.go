@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	TopicOrderPlaced   = "order.placed.v1"
-	TopicTradeExecuted = "trade.executed.v1"
-	TopicOrderCanceled = "order.canceled.v1"
+	TopicOrderPlaced   = "order.placed"
+	TopicTradeExecuted = "trade.executed"
+	TopicOrderCanceled = "order.canceled"
 )
 
 type OrderPlacedEvent struct {
