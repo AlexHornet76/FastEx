@@ -12,7 +12,7 @@ FastEx is a modern, security-first cryptocurrency/stocks exchange implementing i
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture (as of Sprint 3)
 
 ```
 ┌─────────────┐
@@ -23,20 +23,31 @@ FastEx is a modern, security-first cryptocurrency/stocks exchange implementing i
        │
 ┌──────▼──────────────────────────────────────────┐
 │  Gateway Service                                 │
-│  - REST API (order submission, account)         │
-│  - WebSocket (real-time updates)                │
-│  - Hardware-backed auth (WebAuthn-compatible)   │
-│  - JWT middleware                                │
+│  - REST API (auth, account, order routing)       │
+│  - WebSocket (real-time updates - later)         │
+│  - Hardware-backed auth (Ed25519)                │
+│  - JWT issuance + middleware                      │
 └──────┬──────────────────────────────────────────┘
+       │ HTTP (internal)
        │
-┌──────▼──────────┐     ┌─────────────────────────┐
-│  PostgreSQL     │     │  Matching Engine        │
-│  - Users        │     │  - Order Book (BTC-USD) │
-│  - Challenges   │     │  - Price-Time Priority  │
-└─────────────────┘     │  - WAL (Crash Recovery) │
-                        └─────────────────────────┘
+┌──────▼──────────────────────────────────────────┐
+│  Matching Engine Service (engine)                │
+│  - Per-instrument in-memory order book           │
+│  - Deterministic price-time matching             │
+│  - WAL (append-only, crash recovery)             │
+│  - REST API (orders, cancel, orderbook snapshot) │
+└──────┬──────────────────────────────────────────┘
+       │ WAL tail / replay (outbox-style)
+       │
+┌──────▼──────────────────────────────────────────┐
+│  Kafka (Zookeeper-based, docker-compose)         │
+│  - Domain event topics (v1)                      │
+│  - Ordering per instrument via message key       │
+└──────────────────────────────────────────────────┘
 
-(Future: Kafka, Settlement, Market Data, Observability)
+Persistence:
+- PostgreSQL (Gateway domain): users + auth challenges
+- WAL files (Engine domain): order lifecycle + trades (per instrument)
 ```
 
 ---
@@ -118,115 +129,171 @@ FastEx is a modern, security-first cryptocurrency/stocks exchange implementing i
 
 ---
 
-## ✅ Sprint 1 Features (Completed)
+## WAL-backed Kafka Writer (Outbox-style)
 
-### Gateway Service
-- ✅ REST API with CORS configuration for browser clients
-- ✅ WebSocket support with JWT authentication
-- ✅ Health check endpoints
-- ✅ Graceful shutdown handling
+Kafka is used as an **integration bus** for downstream services. The matching engine’s WAL is the **single source of truth**.
 
-### Hardware-Backed Authentication
-- ✅ Ed25519 signature verification (WebAuthn-compatible)
-- ✅ Challenge-response protocol with cryptographic security
-- ✅ No password storage (asymmetric cryptography only)
-- ✅ Replay attack prevention (one-time challenge use + expiration)
+### Why WAL-backed publishing?
+Publishing directly to Kafka from the matching path can lose events when Kafka is down or when the process crashes between “state change” and “publish”.
 
-### JWT Authorization
-- ✅ Token-based authentication with configurable expiration
-- ✅ JWT middleware for protected endpoints
-- ✅ Authorization header transport strategy
+Using WAL-backed publishing ensures:
+- if an event exists in Kafka, it *must have been committed to WAL first*
+- if Kafka is temporarily unavailable, events will be published later from WAL
+- the engine remains correct even when Kafka is down (WAL + recovery still work)
 
-### PostgreSQL Integration
-- ✅ User registration and public key storage
-- ✅ Challenge management with automatic cleanup
-- ✅ Connection pooling and health checks
-- ✅ Schema migrations on startup
+### Kafka Topics (v1)
+- `order.placed.v1`
+- `trade.executed.v1`
+- `order.canceled.v1`
 
-### Infrastructure
-- ✅ Docker Compose deployment
-- ✅ Structured logging with configurable levels
-- ✅ Environment-based configuration
-- ✅ Production-ready error handling
+### Writer responsibilities
+The WAL-backed Kafka writer (publisher) is responsible for:
+- reading committed WAL entries for an instrument
+- converting WAL entries into domain events
+- publishing to Kafka in WAL order
+- checkpointing progress so it can resume after restarts
+
+### Writer Flow (per instrument)
+For each configured instrument (ex: **BTC**, **AAPL**), one publisher loop runs:
+
+1. **Load cursor**
+   - The publisher reads a cursor file:
+     - `<WAL_DIR>/cursors/BTC.cursor`
+     - `<WAL_DIR>/cursors/AAPL.cursor`
+   - The cursor stores: `last_published_sequence_num`
+   - If cursor does not exist → start from `0`
+
+2. **Read WAL entries after cursor**
+   - The publisher reads the instrument WAL file:
+     - `<WAL_DIR>/BTC.wal`
+     - `<WAL_DIR>/AAPL.wal`
+   - It filters entries where `sequence_num > last_published_sequence_num`
+
+3. **Transform WAL entry → Kafka event**
+   - `ORDER_PLACED` → publish to `order.placed`
+   - `TRADE_EXECUTED` → publish to `trade.executed`
+   - `ORDER_CANCELED` → publish to `order.canceled`
+
+4. **Publish to Kafka**
+   - The Kafka message **key** is the instrument (`BTC`, `AAPL`).
+   - This ensures all events for a single instrument go to the same partition, preserving ordering for consumers.
+
+5. **Advance cursor (checkpoint)**
+   - After a successful publish, the publisher writes the new cursor value:
+     - `cursor = entry.sequence_num`
+   - Cursor is written atomically (write temp file → rename) to avoid corruption.
+
+6. **Repeat / poll**
+   - The publisher runs continuously (polling/tailing behavior).
+   - If Kafka is down, publishing fails and the cursor does **not** advance.
+   - On the next retry, the publisher will attempt the same WAL entry again.
+
+### Delivery semantics
+- The writer is designed for **at-least-once** delivery.
+- Duplicates are possible in edge cases (e.g., published to Kafka but crashed before cursor write).
+- Downstream consumers must be idempotent:
+  - dedupe `trade.executed.v1` using `trade_id`
+  - dedupe order events using `order_id`
+
+### End-to-end event lifecycle (one order)
+1. Engine appends `ORDER_PLACED` to WAL (durable).
+2. Engine matches and appends `TRADE_EXECUTED` entries (durable).
+3. WAL publisher observes new WAL entries (sequence > cursor).
+4. WAL publisher publishes corresponding Kafka events (instrument-keyed).
+5. WAL publisher checkpoints cursor so it won’t republish on restart.
 
 ---
 
-## 🔄 Sprint 2 Features (In Progress)
+## ✅ Sprint 1 Features (Completed)
+
+### Gateway Service
+- ✅ REST API with CORS configuration for browser clients — browser-friendly REST entrypoints
+- ✅ WebSocket support with JWT authentication — realtime channel foundation (auth-protected)
+- ✅ Health check endpoints — service health + docker orchestration readiness
+- ✅ Graceful shutdown handling — clean server shutdown and resource cleanup
+
+### Hardware-Backed Authentication
+- ✅ Ed25519 signature verification (WebAuthn-compatible) — public-key verification server-side
+- ✅ Challenge-response protocol with cryptographic security — prove key ownership without secrets on server
+- ✅ No password storage (asymmetric cryptography only) — eliminates password database risk
+- ✅ Replay attack prevention (one-time challenge use + expiration) — challenge TTL + single-use enforcement
+
+### JWT Authorization
+- ✅ Token-based authentication with configurable expiration — short-lived access tokens
+- ✅ JWT middleware for protected endpoints — centralized auth enforcement
+- ✅ Authorization header transport strategy — `Authorization: Bearer <token>`
+
+### PostgreSQL Integration
+- ✅ User registration and public key storage — persist identity + public keys
+- ✅ Challenge management with automatic cleanup — store/expire login challenges
+- ✅ Connection pooling and health checks — stable DB connectivity
+- ✅ Schema migrations on startup — deterministic DB schema bootstrapping
+
+### Infrastructure
+- ✅ Docker Compose deployment — reproducible local environment
+- ✅ Structured logging with configurable levels — consistent logs for debugging
+- ✅ Environment-based configuration — configurable services without code changes
+- ✅ Production-ready error handling — explicit error responses + logging
+
+---
+
+## ✅ Sprint 2 Features (Completed)
 
 ### Completed Components
 
 #### Order Data Models
-- ✅ Order types (Limit, Market)
-- ✅ Order sides (Buy, Sell)
-- ✅ Order lifecycle states (New, Open, Partial, Filled, Cancelled, Rejected)
-- ✅ Trade data structures with buyer/seller tracking
-- ✅ Price representation in smallest units (avoiding floating-point errors)
+- ✅ Order types (Limit, Market) — standard order representations
+- ✅ Order sides (Buy, Sell) — bid/ask direction modeling
+- ✅ Order lifecycle states (New, Open, Partial, Filled, Cancelled, Rejected) — clear state transitions
+- ✅ Trade data structures with buyer/seller tracking — trade events include both parties
+- ✅ Price representation in smallest units (avoiding floating-point errors) — integer prices/qty for correctness
 
 #### Order Book Data Structure
-- ✅ Two-sided order book (Buy side + Sell side)
-- ✅ Price level queues with FIFO ordering
-- ✅ Efficient operations: O(log n) insert/delete, O(1) best price lookup
-- ✅ Lazy sorting for amortized performance
-- ✅ Automatic cleanup of empty price levels
-- ✅ Thread-safe with read/write mutex
+- ✅ Two-sided order book (Buy side + Sell side) — separate bid/ask books
+- ✅ Price level queues with FIFO ordering — time priority within price
+- ✅ Efficient operations: O(log n) insert/delete, O(1) best price lookup — performance-oriented structure
+- ✅ Lazy sorting for amortized performance — avoid unnecessary resorting
+- ✅ Automatic cleanup of empty price levels — keeps book compact
+- ✅ Thread-safe with read/write mutex — safe concurrent reads/writes
 
 #### Matching Algorithm
-- ✅ Price-time priority matching (industry standard)
-- ✅ FIFO execution at same price level
-- ✅ Maker/taker model (execution at resting order's price)
-- ✅ Partial fill support with order state tracking
-- ✅ Multi-level matching (single order matches multiple resting orders)
-- ✅ Full match, partial match, and no-match scenarios
-- ✅ Atomic matching operations (lock-protected for determinism)
+- ✅ Price-time priority matching (industry standard) — fair execution model
+- ✅ FIFO execution at same price level — deterministic ordering
+- ✅ Maker/taker model (execution at resting order's price) — canonical execution rule
+- ✅ Partial fill support with order state tracking — supports multi-fill orders
+- ✅ Multi-level matching (single order matches multiple resting orders) — realistic liquidity consumption
+- ✅ Full match, partial match, and no-match scenarios — complete execution outcomes
+- ✅ Atomic matching operations (lock-protected for determinism) — consistent results under concurrency
 
 #### Write-Ahead Log (WAL)
-- ✅ Append-only log for crash recovery
-- ✅ JSON-based entry format (newline-delimited)
-- ✅ Entry types: `OrderPlaced`, `TradeExecuted`, `OrderCancelled`
-- ✅ Monotonic sequence numbering
-- ✅ fsync after each write (durability guarantee)
-- ✅ Concurrent write safety with mutex protection
-- ✅ Log replay for state reconstruction
-
-### In Progress
+- ✅ Append-only log for crash recovery — durable source of truth
+- ✅ JSON-based entry format (newline-delimited) — easy debugging + simple parsing
+- ✅ Entry types: `OrderPlaced`, `TradeExecuted`, `OrderCancelled` — complete lifecycle coverage
+- ✅ Monotonic sequence numbering — strict ordering of state transitions
+- ✅ fsync after each write (durability guarantee) — survives crashes
+- ✅ Concurrent write safety with mutex protection — safe multi-request usage
+- ✅ Log replay for state reconstruction — deterministic restart recovery
 
 #### Engine Integration
-- 🔄 Orchestration layer combining OrderBook + WAL
-- 🔄 Write-ahead pattern: log BEFORE mutate
-- 🔄 Deterministic recovery from crash
-- 🔄 Proper order lifecycle management during replay
+- ✅ Orchestration layer combining OrderBook + WAL — cohesive engine component
+- ✅ Write-ahead pattern: log BEFORE mutate — correctness-first mutation ordering
+- ✅ Deterministic recovery from crash — replay produces same resulting book
+- ✅ Proper order lifecycle management during replay — consistent filled/partial/open handling
 
-### Upcoming Sprint 2 Tasks
+---
 
-- ⏳ **REST API for Order Submission**
-  - POST /orders endpoint (authenticated)
-  - Order validation and rejection handling
-  - Real-time order status responses
+## ✅ Sprint 3 Features (Completed) — Kafka Integration (WAL-backed)
 
-- ⏳ **Concurrency Model**
-  - Per-instrument goroutine architecture
-  - Channel-based order submission
-  - Lock-free inter-service communication design
-
-- ⏳ **Gateway ↔ Matching Engine Integration**
-  - gRPC or HTTP communication protocol
-  - Request/response flow for order submission
-  - Error propagation and retry logic
-
-- ⏳ **Configuration & Deployment**
-  - Matching engine service containerization
-  - Docker Compose integration with gateway
-  - Environment configuration for instruments
-  - Health checks and monitoring endpoints
+- ✅ Kafka + Zookeeper in Docker Compose — local event backbone
+- ✅ Topics for domain events — `order.placed`, `trade.executed`, `order.canceled`
+- ✅ WAL-backed Kafka writer (outbox-style) — events published only after WAL commit
+- ✅ Per-instrument ordering via Kafka key — key = instrument (BTC/AAPL), ordered consumption per instrument
+- ✅ Cursor checkpointing — publisher resumes from last published WAL sequence after restart
+- ✅ At-least-once delivery model — duplicates possible; downstream consumers must be idempotent
 
 ---
 
 ## 🚀 Future Sprints
-
-### Sprint 3: Kafka Integration
-- Event publishing (`OrderPlaced`, `TradeExecuted`)
-- Partitioning strategy by instrument
-- Exactly-once vs at-least-once semantics
 
 ### Sprint 4: Settlement Service
 - Kafka consumer for `TradeExecuted` events
