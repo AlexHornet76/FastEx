@@ -12,6 +12,7 @@ import (
 	"github.com/AlexHornet76/FastEx/settlement/internal/config"
 	"github.com/AlexHornet76/FastEx/settlement/internal/consumer"
 	"github.com/AlexHornet76/FastEx/settlement/internal/db"
+	"github.com/AlexHornet76/FastEx/settlement/internal/settle"
 )
 
 func main() {
@@ -42,8 +43,10 @@ func main() {
 	defer database.Close()
 	slog.Info("connected to postgres")
 
-	// Start Kafka consumer (logs only for now)
-	c := consumer.NewTradeConsumer(cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID)
+	settler := settle.NewSettler(database.Pool)
+
+	// Kafka consumer
+	c := consumer.NewTradeConsumer(cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID, settler)
 
 	errCh := make(chan error, 1)
 	go func() {
