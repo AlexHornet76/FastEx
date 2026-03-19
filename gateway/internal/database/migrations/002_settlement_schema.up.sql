@@ -35,3 +35,12 @@ CREATE TABLE IF NOT EXISTS processed_trades (
     trade_id UUID PRIMARY KEY,
     processed_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- Seed balances: seller holds BTC, buyer holds USD
+INSERT INTO balances (user_id, asset, available, locked)
+VALUES
+  ('11111111-1111-1111-1111-111111111111', 'BTC', 100, 0),  -- seller has BTC to sell
+  ('11111111-1111-1111-1111-111111111111', 'USD', 0,   0),
+  ('22222222-2222-2222-2222-222222222222', 'USD', 200000, 0), -- buyer has USD to spend
+  ('22222222-2222-2222-2222-222222222222', 'BTC', 0,   0)
+ON CONFLICT (user_id, asset) DO NOTHING;

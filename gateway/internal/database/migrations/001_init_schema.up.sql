@@ -51,12 +51,3 @@ VALUES
     'placeholder-public-key-buyer'
   )
 ON CONFLICT (user_id) DO NOTHING;
-
--- Seed balances: seller holds BTC, buyer holds USD
-INSERT INTO balances (user_id, asset, available, locked)
-VALUES
-  ('11111111-1111-1111-1111-111111111111', 'BTC', 100, 0),  -- seller has BTC to sell
-  ('11111111-1111-1111-1111-111111111111', 'USD', 0,   0),
-  ('22222222-2222-2222-2222-222222222222', 'USD', 200000, 0), -- buyer has USD to spend
-  ('22222222-2222-2222-2222-222222222222', 'BTC', 0,   0)
-ON CONFLICT (user_id, asset) DO NOTHING;
