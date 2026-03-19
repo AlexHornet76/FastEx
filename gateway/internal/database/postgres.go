@@ -2,14 +2,21 @@ package database
 
 import (
 	"context"
+	"embed"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"runtime"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/AlexHornet76/FastEx/gateway/internal/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+//go:embed migrations/*.up.sql
+var migrationFiles embed.FS
 
 // Connect establishes PostgreSQL connection pool
 func Connect(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
@@ -18,9 +25,8 @@ func Connect(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("parse database URL: %w", err)
 	}
 
-	// Connection pool settings
-	poolConfig.MaxConns = int32(runtime.NumCPU() * 5) // 20 on 4-core VPS
-	poolConfig.MinConns = int32(runtime.NumCPU())     // 4 keep-alive connections
+	poolConfig.MaxConns = int32(runtime.NumCPU() * 5)
+	poolConfig.MinConns = int32(runtime.NumCPU())
 	poolConfig.MaxConnLifetime = 1 * time.Hour
 	poolConfig.MaxConnIdleTime = 30 * time.Minute
 	poolConfig.HealthCheckPeriod = 1 * time.Minute
@@ -30,7 +36,6 @@ func Connect(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("create connection pool: %w", err)
 	}
 
-	// Test connection
 	if err := pool.Ping(ctx); err != nil {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
@@ -38,42 +43,46 @@ func Connect(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// RunMigrations applies database schema
-// RunMigrations applies database schema (embedded SQL)
+// RunMigrations applies all embedded *.up.sql files in lexicographic order.
+// Each file is executed in its own transaction so a failure rolls back only
+// that migration and surfaces a clear error.
 func RunMigrations(ctx context.Context, db *pgxpool.Pool) error {
-	// Inline migration SQL (no external files needed)
-	migrationSQL := `
--- Sprint 1: Gateway + Authentication Schema
-
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Users table
-CREATE TABLE IF NOT EXISTS users (
-    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username VARCHAR(50) UNIQUE NOT NULL,
-    public_key TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-
--- Authentication challenges table
-CREATE TABLE IF NOT EXISTS auth_challenges (
-    challenge_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    username VARCHAR(50) NOT NULL,
-    challenge TEXT NOT NULL UNIQUE,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_challenges_challenge ON auth_challenges(challenge);
-CREATE INDEX IF NOT EXISTS idx_challenges_expires ON auth_challenges(expires_at);
-	`
-
-	_, err := db.Exec(ctx, migrationSQL)
+	entries, err := fs.Glob(migrationFiles, "migrations/*.up.sql")
 	if err != nil {
-		return fmt.Errorf("execute migrations: %w", err)
+		return fmt.Errorf("glob migration files: %w", err)
+	}
+
+	// Guarantee deterministic order (001 → 002 → …)
+	sort.Strings(entries)
+
+	for _, path := range entries {
+		name := path[len("migrations/"):]
+
+		sqlBytes, err := migrationFiles.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read migration %s: %w", name, err)
+		}
+
+		sql := strings.TrimSpace(string(sqlBytes))
+		if sql == "" {
+			continue
+		}
+
+		tx, err := db.Begin(ctx)
+		if err != nil {
+			return fmt.Errorf("begin tx for %s: %w", name, err)
+		}
+
+		if _, err := tx.Exec(ctx, sql); err != nil {
+			_ = tx.Rollback(ctx)
+			return fmt.Errorf("execute migration %s: %w", name, err)
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("commit migration %s: %w", name, err)
+		}
+
+		slog.Info("migration applied", "file", name)
 	}
 
 	return nil
