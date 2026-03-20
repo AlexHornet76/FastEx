@@ -47,7 +47,12 @@ VALUES
   ),
   (
     '22222222-2222-2222-2222-222222222222',
-    'test_buyer',
-    'placeholder-public-key-buyer'
+    'test_buyer1',
+    'placeholder-public-key-buyer1'
+  ),
+  (
+    '33333333-3333-3333-3333-333333333333',
+    'test_buyer2',
+    'placeholder-public-key-buyer2'
   )
 ON CONFLICT (user_id) DO NOTHING;

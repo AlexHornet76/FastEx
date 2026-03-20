@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/AlexHornet76/FastEx/settlement/internal/api"
 	"github.com/AlexHornet76/FastEx/settlement/internal/config"
 	"github.com/AlexHornet76/FastEx/settlement/internal/consumer"
 	"github.com/AlexHornet76/FastEx/settlement/internal/db"
@@ -42,6 +44,24 @@ func main() {
 	}
 	defer database.Close()
 	slog.Info("connected to postgres")
+
+	// HTTP health
+	api := api.NewServer(database.Pool)
+	httpServer := &http.Server{
+		Addr:         ":" + cfg.HTTPPort,
+		Handler:      api.Router(),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
+
+	go func() {
+		slog.Info("settlement http listening", "port", cfg.HTTPPort)
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("http server error", "error", err)
+			stop()
+		}
+	}()
 
 	settler := settle.NewSettler(database.Pool)
 

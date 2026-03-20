@@ -9,6 +9,8 @@ import (
 type Config struct {
 	LogLevel string
 
+	HTTPPort string
+
 	PostgresHost     string
 	PostgresPort     int
 	PostgresUser     string
@@ -23,8 +25,8 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		LogLevel: getEnv("LOG_LEVEL", "info"),
-
+		LogLevel:         getEnv("LOG_LEVEL", "info"),
+		HTTPPort:         getEnv("HTTP_PORT", "8090"),
 		PostgresHost:     getEnv("POSTGRES_HOST", "localhost"),
 		PostgresPort:     getEnvInt("POSTGRES_PORT", 5432),
 		PostgresUser:     getEnv("POSTGRES_USER", "exchangeuser"),

@@ -147,6 +147,8 @@ services:
       context: ./settlement
       dockerfile: Dockerfile
     container_name: settlement
+    ports:
+      - "${SETTLEMENT_PORT}:8090"
     environment:
       LOG_LEVEL: ${LOG_LEVEL}
 
@@ -160,6 +162,13 @@ services:
       KAFKA_BROKERS: ${KAFKA_BROKERS}
       KAFKA_TOPIC: ${KAFKA_TOPIC_TRADE_EXECUTED}
       KAFKA_GROUP_ID: ${KAFKA_GROUP_ID}
+
+      SETTLEMENT_PORT: ${SETTLEMENT_PORT}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     depends_on:
       postgres:
         condition: service_healthy

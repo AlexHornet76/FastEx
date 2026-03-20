@@ -40,7 +40,10 @@ func (s *Settler) ApplyTrade(ctx context.Context, ev *events.TradeExecutedEvent)
 	// int64 -> NUMERIC safely by passing as string
 	// We'll store instrument quantity and USD value.
 	instrumentQty := ev.Quantity
-	usdValue := ev.Price * ev.Quantity
+	usdValue, okOF := mulCheckOverflow(ev.Price, ev.Quantity)
+	if !okOF {
+		return s.reject(ctx, ev, fmt.Sprintf("INVALID_EVENT: notional overflow price=%d qty=%d", ev.Price, ev.Quantity))
+	}
 
 	// Sanity checks
 	if ev.TradeID == [16]byte{} || ev.Instrument == "" || ev.BuyerUserID == [16]byte{} || ev.SellerUserID == [16]byte{} {
@@ -127,32 +130,20 @@ func (s *Settler) ApplyTrade(ctx context.Context, ev *events.TradeExecutedEvent)
 
 	now := time.Now().UTC()
 
-	// instrument leg
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO ledger_entries (trade_id, user_id, asset, amount, created_at)
-		VALUES
-			($1, $2, $3, $4, $5),  -- buyer +instrument
-			($1, $6, $3, $7, $5)   -- seller -instrument
+	INSERT INTO ledger_entries (trade_id, user_id, asset, amount, created_at)
+	VALUES
+		($1, $2, $3, $4, $5),  -- buyer +instrument
+		($1, $6, $3, $7, $5),  -- seller -instrument
+		($1, $2, $8, $9, $5),  -- buyer -USD
+		($1, $6, $8, $10, $5)  -- seller +USD
 	`,
 		ev.TradeID,
 		ev.BuyerUserID, ev.Instrument, fmt.Sprintf("%d", instrumentQty), now,
 		ev.SellerUserID, fmt.Sprintf("-%d", instrumentQty),
+		USDAsset, fmt.Sprintf("-%d", usdValue), fmt.Sprintf("%d", usdValue),
 	); err != nil {
-		return false, fmt.Errorf("insert instrument ledger: %w", err)
-	}
-
-	// USD leg
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO ledger_entries (trade_id, user_id, asset, amount, created_at)
-		VALUES
-			($1, $2, $3, $4, $5),  -- buyer -USD
-			($1, $6, $3, $7, $5)   -- seller +USD
-	`,
-		ev.TradeID,
-		ev.BuyerUserID, USDAsset, fmt.Sprintf("-%d", usdValue), now,
-		ev.SellerUserID, fmt.Sprintf("%d", usdValue),
-	); err != nil {
-		return false, fmt.Errorf("insert USD ledger: %w", err)
+		return false, fmt.Errorf("insert ledger: %w", err)
 	}
 
 	// Double-entry bookkeeping
@@ -301,4 +292,15 @@ func (s *Settler) reject(ctx context.Context, ev *events.TradeExecutedEvent, rea
 		return false, fmt.Errorf("commit reject: %w", err)
 	}
 	return false, nil
+}
+
+func mulCheckOverflow(a, b int64) (int64, bool) {
+	if a == 0 || b == 0 {
+		return 0, true
+	}
+	result := a * b
+	if result/a != b {
+		return 0, false
+	}
+	return result, true
 }

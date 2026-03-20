@@ -1,6 +1,8 @@
 # Build stage
 FROM golang:1.25.3-alpine AS builder
 
+RUN apk add --no-cache ca-certificates wget
+
 WORKDIR /app
 
 COPY go.mod go.sum ./
