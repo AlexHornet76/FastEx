@@ -177,6 +177,33 @@ services:
     networks:
       - fastex
     restart: on-failure
+
+  marketdata:
+    build:
+      context: ./marketdata
+      dockerfile: Dockerfile
+    container_name: marketdata
+    ports:
+      - "${MARKETDATA_PORT}:${MARKETDATA_PORT}"
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL}
+      MARKETDATA_PORT: ${MARKETDATA_PORT}
+      KAFKA_BROKERS: ${KAFKA_BROKERS}
+      KAFKA_TOPIC: ${KAFKA_TOPIC_TRADE_EXECUTED}
+      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID}
+    depends_on:
+      kafka:
+        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
+    networks:
+      - fastex
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "${MARKETDATA_HEALTHCHECK_URL}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     
       
 volumes:
