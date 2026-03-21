@@ -202,6 +202,145 @@ For each configured instrument (ex: **BTC**, **AAPL**), one publisher loop runs:
 4. WAL publisher publishes corresponding Kafka events (instrument-keyed).
 5. WAL publisher checkpoints cursor so it won’t republish on restart.
 
+# Settlement Service
+
+## Purpose
+Settlement is the first downstream service that consumes matching engine events and turns them into **accounting state** in PostgreSQL.
+
+It consumes **trade events** and produces:
+- an append-only **ledger** (audit trail, double-entry bookkeeping)
+- fast-read **balances** (materialized view of ledger, per user + asset)
+- **idempotency** tracking (so Kafka at-least-once delivery is safe)
+
+This service is designed to be deterministic and safe under retries.
+
+---
+
+## Inputs (Kafka)
+
+### Topic
+- `trade.executed`
+
+### Event shape (JSON)
+Fields expected (based on engine publisher):
+- `trade_id` (UUID)
+- `instrument` (string: `BTC`, `AAPL`, etc.)
+- `buyer_user_id` (UUID)
+- `seller_user_id` (UUID)
+- `price` (int64)
+- `quantity` (int64)
+
+**Assumption (Sprint 4 simplification):**
+- all monetary settlement is in **USD**
+- trade notional is `price * quantity` (int64 units)
+- price/quantity are already “smallest units” (integers); no floats
+
+---
+
+## Storage (PostgreSQL)
+
+### `balances`
+One row per `(user_id, asset)`.
+
+- `asset` can be:
+  - `USD`
+  - an instrument symbol like `BTC`, `AAPL`
+
+Columns:
+- `available` NUMERIC(30,10)
+- `locked` NUMERIC(30,10) (reserved funds; used in later sprints)
+
+### `ledger_entries`
+Append-only journal.
+
+Columns:
+- `trade_id` (UUID)
+- `user_id` (UUID)
+- `asset` (string)
+- `amount` NUMERIC(30,10) **signed**
+  - `+X` means credit (user receives)
+  - `-X` means debit  (user pays)
+
+### `processed_trades`
+Idempotency gate.
+
+- `trade_id` is unique/PK
+- `status`:
+  - `APPLIED`  (ledger + balances updated)
+  - `REJECTED` (permanent failure, e.g. insufficient funds)
+- optional `reason` for rejected trades
+
+---
+
+## End-to-end processing flow (per `trade.executed` message)
+
+### Step 0 — Parse event
+Settlement parses JSON into a `TradeExecutedEvent`.
+
+If required fields are missing, it marks the trade as:
+- `processed_trades.status = REJECTED`
+- `reason = INVALID_EVENT: ...`
+
+### Step 1 — Start DB transaction
+All work is done in a single DB transaction to guarantee atomicity.
+
+### Step 2 — Idempotency check
+Settlement checks if `trade_id` already exists in `processed_trades`.
+
+- if yes → **SKIP** (do nothing)
+- if no → continue
+
+### Step 3 — Row locking + insufficient funds check
+Settlement ensures relevant `balances` rows exist and locks them using:
+
+- `SELECT ... FOR UPDATE`
+
+Then it checks:
+- buyer `USD.available >= price*quantity`
+- seller `<instrument>.available >= quantity`
+
+If any check fails:
+- insert `processed_trades(trade_id, status='REJECTED', reason='INSUFFICIENT_FUNDS ...')`
+- commit (no ledger, no balance update)
+
+### Step 4 — Double-entry ledger write (4 entries)
+For each trade we write exactly four entries:
+
+| Party  | Asset        | Amount |
+|--------|--------------|--------|
+| buyer  | instrument   | `+quantity` |
+| buyer  | USD          | `-(price*quantity)` |
+| seller | instrument   | `-quantity` |
+| seller | USD          | `+(price*quantity)` |
+
+This is standard double-entry accounting: every debit has a matching credit.
+
+### Step 5 — Double-entry validation invariant
+Settlement validates accounting correctness:
+- `SUM(amount)` for the instrument is **0**
+- `SUM(amount)` for `USD` is **0**
+
+If not true, settlement fails the transaction (this indicates a bug).
+
+### Step 6 — Update balances
+Balances are updated via UPSERT + increment:
+- buyer +instrument, buyer -USD
+- seller -instrument, seller +USD
+
+### Step 7 — Mark trade processed
+Settlement inserts:
+- `processed_trades(trade_id, status='APPLIED')`
+
+### Step 8 — Commit
+Transaction commits.
+
+---
+
+## Delivery semantics
+- Kafka consumption is **at-least-once**
+- Settlement processing is **idempotent by trade_id**
+- Duplicates do not change balances because `processed_trades` is the gate
+
 ---
 
 ## ✅ Sprint 1 Features (Completed)

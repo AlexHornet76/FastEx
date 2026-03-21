@@ -73,6 +73,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	wsHandler := handlers.NewWebSocketHandler(upgrader, cfg.JWTSecret)
 	orderHandler := handlers.NewOrderHandler(matchingClient)
+	depositHandler := handlers.NewDepositHandler(db)
 
 	// Setup routes
 	mux := http.NewServeMux()
@@ -85,6 +86,11 @@ func main() {
 
 	// WebSocket
 	mux.HandleFunc("/ws", wsHandler.HandleConnection)
+
+	// Deposit routes
+	mux.Handle("POST /api/deposits", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(depositHandler.Deposit),
+	))
 
 	// Protected routes (example)
 	mux.Handle("GET /api/user/profile", auth.JWTMiddleware(cfg.JWTSecret)(
