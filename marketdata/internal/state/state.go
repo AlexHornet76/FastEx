@@ -18,11 +18,13 @@ type Ticker struct {
 type Store struct {
 	mu      sync.RWMutex
 	tickers map[string]*Ticker
+	candles *CandleStore
 }
 
 func NewStore() *Store {
 	return &Store{
 		tickers: make(map[string]*Ticker),
+		candles: NewCandleStore(10), // keep last 10 candles per instrument for demo
 	}
 }
 
@@ -41,6 +43,7 @@ func (s *Store) ApplyTrade(instrument string, price, qty int64, t time.Time) {
 	x.LastTrade = t
 	x.TradeCount++
 	x.Volume += qty
+	s.candles.ApplyTrade(instrument, qty, price, t)
 }
 
 func (s *Store) GetTicker(instrument string) (*Ticker, bool) {
@@ -55,4 +58,8 @@ func (s *Store) GetTicker(instrument string) (*Ticker, bool) {
 	// return copy so caller can’t mutate internal state
 	cp := *x
 	return &cp, true
+}
+
+func (s *Store) GetCandles(instrument string, limit int) ([]Candle, bool) {
+	return s.candles.GetCandles(instrument, limit)
 }

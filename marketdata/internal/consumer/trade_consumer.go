@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/AlexHornet76/FastEx/marketdata/events"
-	"github.com/AlexHornet76/FastEx/marketdata/state"
+	"github.com/AlexHornet76/FastEx/marketdata/internal/events"
+	"github.com/AlexHornet76/FastEx/marketdata/internal/state"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -16,7 +16,7 @@ type TradeConsumer struct {
 	store  *state.Store
 }
 
-func NewTradeConsumer(brokers []string, topic, groupID string, store *state.Store) *TradeConsumer {
+func NewTradeConsumer(brokers []string, topic string, groupID string, store *state.Store) *TradeConsumer {
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  brokers,
 		Topic:    topic,
@@ -38,9 +38,11 @@ func (c *TradeConsumer) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
 		var ev events.TradeExecutedEvent
 		if err := json.Unmarshal(msg.Value, &ev); err != nil {
 			slog.Error("marketdata: failed to unmarshal trade event", "error", err, "value", string(msg.Value))
+			// For now: skip bad messages (don't crash loop)
 			continue
 		}
 
@@ -57,8 +59,7 @@ func (c *TradeConsumer) Run(ctx context.Context) error {
 			"price", ev.Price,
 			"qty", ev.Quantity,
 			"trade_id", ev.TradeID,
-			"partition", msg.Partition,
-			"offset", msg.Offset,
-		)
+			"kafka_partition", msg.Partition,
+			"kafka_offset", msg.Offset)
 	}
 }

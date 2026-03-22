@@ -109,6 +109,12 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_TRANSACTION_STATE_LOG_MIN_ISR}
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: ${KAFKA_AUTO_CREATE_TOPICS_ENABLE}
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     networks:
       - fastex
 
@@ -190,10 +196,10 @@ services:
       MARKETDATA_PORT: ${MARKETDATA_PORT}
       KAFKA_BROKERS: ${KAFKA_BROKERS}
       KAFKA_TOPIC: ${KAFKA_TOPIC_TRADE_EXECUTED}
-      KAFKA_GROUP_ID: ${KAFKA_GROUP_ID}
+      KAFKA_GROUP_ID: ${MARKETDATA_KAFKA_GROUP_ID}
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
     networks:
