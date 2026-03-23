@@ -30,11 +30,10 @@ func main() {
 
 	// Initialize structured logger
 	logger.Init(cfg.LogLevel)
-	slog.Info("starting gateway service")
+	slog.Info("starting gateway service", "version", "sprint-1")
 
 	// Connect to PostgreSQL
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
 	db, err := database.Connect(ctx, cfg)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
@@ -75,7 +74,20 @@ func main() {
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	wsHandler := handlers.NewWebSocketHandler(upgrader, cfg.JWTSecret)
 	orderHandler := handlers.NewOrderHandler(matchingClient)
-	depositHandler := handlers.NewDepositHandler(db)
+
+	marketProxy, err := handlers.NewMarketDataProxyHandler(cfg.MarketDataURL)
+	if err != nil {
+		slog.Error("invalid MARKETDATA_URL", "error", err, "value", cfg.MarketDataURL)
+		os.Exit(1)
+	}
+
+	// Start Kafka consumer for public market WS feed
+	marketConsumer := marketws.NewConsumer(cfg.KafkaBrokers, cfg.KafkaTopicTradeExecuted, cfg.KafkaGroupIDMarketWS, wsHandler)
+	go func() {
+		if err := marketConsumer.Run(ctx); err != nil && err != context.Canceled {
+			slog.Error("marketws consumer stopped", "error", err)
+		}
+	}()
 
 	// Setup routes
 	mux := http.NewServeMux()
@@ -86,13 +98,15 @@ func main() {
 	mux.HandleFunc("POST /auth/challenge", authHandler.Challenge)
 	mux.HandleFunc("POST /auth/verify", authHandler.Verify)
 
-	// WebSocket
+	// WebSocket (existing)
 	mux.HandleFunc("/ws", wsHandler.HandleConnection)
 
-	// Deposit routes
-	mux.Handle("POST /api/deposits", auth.JWTMiddleware(cfg.JWTSecret)(
-		http.HandlerFunc(depositHandler.Deposit),
-	))
+	// Public market WebSocket
+	mux.HandleFunc("/ws/market", wsHandler.HandleConnection)
+
+	// Public marketdata snapshot proxy
+	mux.HandleFunc("GET /api/market/ticker/{instrument}", marketProxy.GetTicker)
+	mux.HandleFunc("GET /api/market/candles/{instrument}", marketProxy.GetCandles)
 
 	// Protected routes (example)
 	mux.Handle("GET /api/user/profile", auth.JWTMiddleware(cfg.JWTSecret)(
@@ -134,25 +148,14 @@ func main() {
 		}
 	}()
 
-	// start kafka consumer for market WS
-	marketConsumer := marketws.NewConsumer(cfg.KafkaBrokers, cfg.KafkaTopicTradeExecuted, cfg.KafkaGroupIDMarketWS, wsHandler)
-	go func() {
-		if err := marketConsumer.Run(ctx); err != nil {
-			slog.Error("market ws consumer stopped", "error", err)
-		}
-	}()
-
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	slog.Info("shutting down server...")
-
-	cancel()
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server forced to shutdown", "error", err)

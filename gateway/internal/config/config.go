@@ -26,6 +26,7 @@ type Config struct {
 	KafkaBrokers            []string
 	KafkaTopicTradeExecuted string
 	KafkaGroupIDMarketWS    string
+	MarketDataURL           string
 }
 
 // Load reads configuration from environment variables
@@ -50,6 +51,7 @@ func Load() (*Config, error) {
 		KafkaBrokers:            strings.Split(getEnv("KAFKA_BROKERS", "localhost:29092"), ","),
 		KafkaTopicTradeExecuted: getEnv("KAFKA_TOPIC_TRADE_EXECUTED", "trade.executed"),
 		KafkaGroupIDMarketWS:    getEnv("KAFKA_GROUP_ID_MARKET_WS", "gateway-market-ws-v1"),
+		MarketDataURL:           getEnv("MARKETDATA_URL", "http://localhost:8091"),
 	}
 
 	// Validate JWT secret

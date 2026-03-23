@@ -9,6 +9,7 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+// TradeExecutedEvent is the JSON payload we expect on topic trade.executed
 type TradeExecutedEvent struct {
 	EventType  string    `json:"event_type"`
 	EventTime  time.Time `json:"event_time"`
@@ -21,7 +22,7 @@ type TradeExecutedEvent struct {
 }
 
 type Broadcaster interface {
-	BroadcastMarket(instrument string, msg any)
+	BroadcastMarketTrade(instrument string, msg any)
 }
 
 type Consumer struct {
@@ -66,6 +67,6 @@ func (c *Consumer) Run(ctx context.Context) error {
 			"trade_id":   ev.TradeID,
 			"time":       ev.EventTime,
 		}
-		c.broadcaster.BroadcastMarket(ev.Instrument, out)
+		c.broadcaster.BroadcastMarketTrade(ev.Instrument, out)
 	}
 }
