@@ -19,6 +19,9 @@ type ClientInfo struct {
 	UserID   string
 	Username string
 	Conn     *websocket.Conn
+
+	mu   sync.Mutex
+	Subs map[string]bool // e.g. "ticker:BTCUSD", "orderbook:ETHUSD"
 }
 
 func NewWebSocketHandler(upgrader *websocket.Upgrader, jwtSecret string) *WebSocketHandler {
@@ -115,18 +118,42 @@ func (h *WebSocketHandler) handleMessages(conn *websocket.Conn) {
 			continue
 		}
 
-		// Handle other message types (Sprint 1: just log)
-		slog.Debug("websocket message received",
-			"type", msgType,
-			"user_id", clientInfo.UserID,
-			"message", msg)
+		// subscribe/unsubscribe
+		switch msgType {
+		case "subscribe", "unsubscribe":
+			channel, _ := msg["channel"].(string)
+			instrument, _ := msg["instrument"].(string)
+			if channel == "" || instrument == "" {
+				h.sendError(conn, "channel and instrument required")
+				continue
+			}
+			key := channel + ":" + instrument
+			clientInfo.mu.Lock()
+			if msgType == "subscribe" {
+				clientInfo.Subs[key] = true
+			} else {
+				delete(clientInfo.Subs, key)
+			}
+			clientInfo.mu.Unlock()
 
-		// Echo back for testing
-		response := map[string]interface{}{
-			"type":    "echo",
-			"message": msg,
+			conn.WriteJSON(map[string]any{
+				"type":       map[bool]string{true: "subscribed", false: "unsubscribed"}[msgType == "subscribe"],
+				"channel":    channel,
+				"instrument": instrument,
+			})
+			continue
+		default:
+			// keep echo for debugging
+			slog.Debug("websocket message received",
+				"type", msgType,
+				"user_id", clientInfo.UserID,
+				"message", msg)
+
+			conn.WriteJSON(map[string]any{
+				"type":    "echo",
+				"message": msg,
+			})
 		}
-		conn.WriteJSON(response)
 	}
 }
 
@@ -140,13 +167,36 @@ func (h *WebSocketHandler) sendError(conn *websocket.Conn, message string) {
 	}
 }
 
-// BroadcastToUser sends message to specific user (used by future services)
-func (h *WebSocketHandler) BroadcastToUser(userID string, message interface{}) {
-	h.clients.Range(func(key, value interface{}) bool {
-		client := value.(*ClientInfo)
-		if client.UserID == userID {
+// BroadcastMarket sends a message to all clients subscribed to an instrument+channel.
+// will broadcast "trade" events to channel "ticker" and/or "candles" later.
+func (h *WebSocketHandler) BroadcastMarket(instrument string, message any) {
+	// infer channel from message.type
+	m, ok := message.(map[string]any)
+	if !ok {
+		return
+	}
+	t, _ := m["type"].(string)
+	channel := ""
+	switch t {
+	case "trade":
+		channel = "ticker"
+	case "candle":
+		channel = "candles"
+	default:
+		channel = "ticker"
+	}
+	key := channel + ":" + instrument
+
+	h.clients.Range(func(_, v any) bool {
+		client := v.(*ClientInfo)
+
+		client.mu.Lock()
+		subscribed := client.Subs[key]
+		client.mu.Unlock()
+
+		if subscribed {
 			if err := client.Conn.WriteJSON(message); err != nil {
-				slog.Error("broadcast to user failed", "user_id", userID, "error", err)
+				slog.Error("market broadcast failed", "user_id", client.UserID, "error", err)
 			}
 		}
 		return true

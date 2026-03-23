@@ -197,6 +197,7 @@ services:
       KAFKA_BROKERS: ${KAFKA_BROKERS}
       KAFKA_TOPIC: ${KAFKA_TOPIC_TRADE_EXECUTED}
       KAFKA_GROUP_ID: ${MARKETDATA_KAFKA_GROUP_ID}
+      KAFKA_GROUP_ID_MARKET_WS: ${KAFKA_GROUP_ID_MARKET_WS}
     depends_on:
       kafka:
         condition: service_healthy

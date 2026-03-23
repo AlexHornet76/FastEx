@@ -15,6 +15,7 @@ import (
 	"github.com/AlexHornet76/FastEx/gateway/internal/database"
 	"github.com/AlexHornet76/FastEx/gateway/internal/handlers"
 	"github.com/AlexHornet76/FastEx/gateway/internal/logger"
+	"github.com/AlexHornet76/FastEx/gateway/internal/marketws"
 	"github.com/AlexHornet76/FastEx/gateway/internal/matching"
 	"github.com/gorilla/websocket"
 )
@@ -29,10 +30,11 @@ func main() {
 
 	// Initialize structured logger
 	logger.Init(cfg.LogLevel)
-	slog.Info("starting gateway service", "version", "sprint-1")
+	slog.Info("starting gateway service")
 
 	// Connect to PostgreSQL
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	db, err := database.Connect(ctx, cfg)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
@@ -132,14 +134,25 @@ func main() {
 		}
 	}()
 
+	// start kafka consumer for market WS
+	marketConsumer := marketws.NewConsumer(cfg.KafkaBrokers, cfg.KafkaTopicTradeExecuted, cfg.KafkaGroupIDMarketWS, wsHandler)
+	go func() {
+		if err := marketConsumer.Run(ctx); err != nil {
+			slog.Error("market ws consumer stopped", "error", err)
+		}
+	}()
+
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	slog.Info("shutting down server...")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+
+	cancel()
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server forced to shutdown", "error", err)
