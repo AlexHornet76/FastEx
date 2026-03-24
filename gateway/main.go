@@ -32,9 +32,12 @@ func main() {
 	logger.Init(cfg.LogLevel)
 	slog.Info("starting gateway service", "version", "sprint-1")
 
+	// root context for background workers + shutdown
+	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	// Connect to PostgreSQL
-	ctx := context.Background()
-	db, err := database.Connect(ctx, cfg)
+	db, err := database.Connect(rootCtx, cfg)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -43,14 +46,14 @@ func main() {
 	slog.Info("database connected", "host", cfg.PostgresHost, "database", cfg.PostgresDB)
 
 	// Run migrations
-	if err := database.RunMigrations(ctx, db); err != nil {
+	if err := database.RunMigrations(rootCtx, db); err != nil {
 		slog.Error("migration failed", "error", err)
 		os.Exit(1)
 	}
 	slog.Info("migrations completed")
 
 	// Start background challenge cleanup
-	go database.CleanupExpiredChallenges(ctx, db)
+	go database.CleanupExpiredChallenges(rootCtx, db)
 
 	// Initialize matching engine client
 	matchingClient := matching.NewClient(cfg.MatchingEngineURL)
@@ -75,17 +78,26 @@ func main() {
 	wsHandler := handlers.NewWebSocketHandler(upgrader, cfg.JWTSecret)
 	orderHandler := handlers.NewOrderHandler(matchingClient)
 
+	// marketdata proxy (snapshots)
 	marketProxy, err := handlers.NewMarketDataProxyHandler(cfg.MarketDataURL)
 	if err != nil {
 		slog.Error("invalid MARKETDATA_URL", "error", err, "value", cfg.MarketDataURL)
 		os.Exit(1)
 	}
 
-	// Start Kafka consumer for public market WS feed
-	marketConsumer := marketws.NewConsumer(cfg.KafkaBrokers, cfg.KafkaTopicTradeExecuted, cfg.KafkaGroupIDMarketWS, wsHandler)
+	// ---- Kafka consumer for global market WS feed ----
+	// IMPORTANT: read from trade.settled, NOT trade.executed
+	marketConsumer := marketws.NewConsumer(
+		cfg.KafkaBrokers,
+		cfg.KafkaTopicTradeSettled,
+		cfg.KafkaGroupIDMarketWS,
+		wsHandler,
+	)
+
 	go func() {
-		if err := marketConsumer.Run(ctx); err != nil && err != context.Canceled {
+		if err := marketConsumer.Run(rootCtx); err != nil && err != context.Canceled {
 			slog.Error("marketws consumer stopped", "error", err)
+			stop()
 		}
 	}()
 
@@ -98,10 +110,8 @@ func main() {
 	mux.HandleFunc("POST /auth/challenge", authHandler.Challenge)
 	mux.HandleFunc("POST /auth/verify", authHandler.Verify)
 
-	// WebSocket (existing)
+	// WebSocket
 	mux.HandleFunc("/ws", wsHandler.HandleConnection)
-
-	// Public market WebSocket
 	mux.HandleFunc("/ws/market", wsHandler.HandleConnection)
 
 	// Public marketdata snapshot proxy
@@ -144,14 +154,11 @@ func main() {
 		slog.Info("gateway listening", "port", cfg.GatewayPort)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server error", "error", err)
-			os.Exit(1)
+			stop()
 		}
 	}()
 
-	// Graceful shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	<-rootCtx.Done()
 
 	slog.Info("shutting down server...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

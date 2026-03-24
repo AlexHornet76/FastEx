@@ -19,9 +19,6 @@ type ClientInfo struct {
 	UserID   string
 	Username string
 	Conn     *websocket.Conn
-
-	mu   sync.Mutex
-	Subs map[string]bool // e.g. "ticker:BTCUSD", "orderbook:ETHUSD"
 }
 
 func NewWebSocketHandler(upgrader *websocket.Upgrader, jwtSecret string) *WebSocketHandler {
@@ -31,7 +28,6 @@ func NewWebSocketHandler(upgrader *websocket.Upgrader, jwtSecret string) *WebSoc
 	}
 }
 
-// HandleConnection upgrades HTTP to WebSocket.
 func (h *WebSocketHandler) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -39,23 +35,19 @@ func (h *WebSocketHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	ci := &ClientInfo{
-		Conn: conn,
-		Subs: make(map[string]bool),
-	}
-	h.clients.Store(conn, ci)
-
 	slog.Info("websocket connection established", "remote_addr", r.RemoteAddr)
-
-	go h.handleMessages(conn, ci)
+	go h.handleMessages(conn)
 }
 
-func (h *WebSocketHandler) handleMessages(conn *websocket.Conn, ci *ClientInfo) {
+func (h *WebSocketHandler) handleMessages(conn *websocket.Conn) {
 	defer func() {
 		h.clients.Delete(conn)
-		conn.Close()
+		_ = conn.Close()
 		slog.Debug("websocket connection closed")
 	}()
+
+	var authenticated bool
+	var clientInfo ClientInfo
 
 	for {
 		var msg map[string]any
@@ -63,18 +55,21 @@ func (h *WebSocketHandler) handleMessages(conn *websocket.Conn, ci *ClientInfo) 
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 				slog.Warn("websocket read error", "error", err)
 			}
-			break
+			return
 		}
 
 		msgType, ok := msg["type"].(string)
-		if !ok {
+		if !ok || msgType == "" {
 			h.sendError(conn, "missing or invalid 'type' field")
 			continue
 		}
 
-		switch msgType {
-		case "auth":
-			// Optional auth: sets user_id/username if provided.
+		if msgType == "auth" {
+			if authenticated {
+				h.sendError(conn, "already authenticated")
+				continue
+			}
+
 			token, ok := msg["token"].(string)
 			if !ok || token == "" {
 				h.sendError(conn, "missing 'token' field")
@@ -88,83 +83,44 @@ func (h *WebSocketHandler) handleMessages(conn *websocket.Conn, ci *ClientInfo) 
 				continue
 			}
 
-			ci.mu.Lock()
-			ci.UserID = claims.UserID
-			ci.Username = claims.Username
-			ci.mu.Unlock()
+			clientInfo = ClientInfo{
+				UserID:   claims.UserID,
+				Username: claims.Username,
+				Conn:     conn,
+			}
+			h.clients.Store(conn, &clientInfo)
+			authenticated = true
 
-			slog.Info("websocket client authenticated", "user_id", claims.UserID, "username", claims.Username)
 			_ = conn.WriteJSON(map[string]any{
 				"type":     "auth_success",
-				"user_id":  claims.UserID,
-				"username": claims.Username,
+				"user_id":  clientInfo.UserID,
+				"username": clientInfo.Username,
 			})
-
-		case "subscribe", "unsubscribe":
-			// Public subscribe/unsubscribe.
-			channel, _ := msg["channel"].(string)
-			instrument, _ := msg["instrument"].(string)
-
-			// We support channel="trade" for now.
-			if channel == "" || instrument == "" {
-				h.sendError(conn, "channel and instrument required")
-				continue
-			}
-			if channel != "trade" {
-				h.sendError(conn, "unsupported channel (use 'trade')")
-				continue
-			}
-
-			key := channel + ":" + instrument
-			ci.mu.Lock()
-			if msgType == "subscribe" {
-				ci.Subs[key] = true
-			} else {
-				delete(ci.Subs, key)
-			}
-			ci.mu.Unlock()
-
-			_ = conn.WriteJSON(map[string]any{
-				"type":       map[bool]string{true: "subscribed", false: "unsubscribed"}[msgType == "subscribe"],
-				"channel":    channel,
-				"instrument": instrument,
-			})
-
-		default:
-			// Keep echo for testing/debugging
-			_ = conn.WriteJSON(map[string]any{
-				"type":    "echo",
-				"message": msg,
-			})
+			continue
 		}
+
+		// global feed
+		if !authenticated {
+			h.sendError(conn, "authentication required")
+			continue
+		}
+		h.sendError(conn, "unsupported message type (global feed)")
 	}
 }
 
 func (h *WebSocketHandler) sendError(conn *websocket.Conn, message string) {
-	response := map[string]interface{}{
+	_ = conn.WriteJSON(map[string]any{
 		"type":  "error",
 		"error": message,
-	}
-	if err := conn.WriteJSON(response); err != nil {
-		slog.Error("send error failed", "error", err)
-	}
+	})
 }
 
-// BroadcastMarketTrade sends raw trade update to all clients subscribed to trade:<instrument>.
-func (h *WebSocketHandler) BroadcastMarketTrade(instrument string, message any) {
-	key := "trade:" + instrument
-
+// Broadcast sends a message to ALL authenticated WS clients.
+func (h *WebSocketHandler) Broadcast(message any) {
 	h.clients.Range(func(_, v any) bool {
 		client := v.(*ClientInfo)
-
-		client.mu.Lock()
-		subscribed := client.Subs[key]
-		client.mu.Unlock()
-
-		if subscribed {
-			if err := client.Conn.WriteJSON(message); err != nil {
-				slog.Error("market trade broadcast failed", "user_id", client.UserID, "error", err)
-			}
+		if err := client.Conn.WriteJSON(message); err != nil {
+			slog.Error("broadcast failed", "user_id", client.UserID, "error", err)
 		}
 		return true
 	})

@@ -17,7 +17,7 @@ func main() {
 	}
 
 	// Encode as hex
-	privateKeyHex := hex.EncodeToString(privateKey)
+	privateKeyHex := fmt.Sprintf("%x", []byte(privateKey))
 	publicKeyHex := hex.EncodeToString(publicKey)
 
 	fmt.Println("Ed25519 Key Pair Generated")
