@@ -19,8 +19,13 @@ type Config struct {
 	PostgresSSLMode  string
 
 	KafkaBrokers []string
+
+	// input
 	KafkaTopic   string
 	KafkaGroupID string
+
+	// output
+	KafkaSettledTopic string
 }
 
 func Load() *Config {
@@ -34,9 +39,10 @@ func Load() *Config {
 		PostgresDB:       getEnv("POSTGRES_DB", "exchangedb"),
 		PostgresSSLMode:  getEnv("POSTGRES_SSLMODE", "disable"),
 
-		KafkaBrokers: parseCSV(getEnv("KAFKA_BROKERS", "localhost:29092")),
-		KafkaTopic:   getEnv("KAFKA_TOPIC", "trade.executed"),
-		KafkaGroupID: getEnv("KAFKA_GROUP_ID", "settlement-v1"),
+		KafkaBrokers:      parseCSV(getEnv("KAFKA_BROKERS", "localhost:29092")),
+		KafkaTopic:        getEnv("KAFKA_TOPIC", "trade.executed"),
+		KafkaGroupID:      getEnv("KAFKA_GROUP_ID", "settlement"),
+		KafkaSettledTopic: getEnv("KAFKA_SETTLED_TOPIC", "trade.settled"),
 	}
 }
 

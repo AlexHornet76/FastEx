@@ -15,6 +15,7 @@ import (
 	"github.com/AlexHornet76/FastEx/settlement/internal/consumer"
 	"github.com/AlexHornet76/FastEx/settlement/internal/db"
 	"github.com/AlexHornet76/FastEx/settlement/internal/settle"
+	"github.com/AlexHornet76/FastEx/settlement/publisher"
 )
 
 func main() {
@@ -66,11 +67,12 @@ func main() {
 	settler := settle.NewSettler(database.Pool)
 
 	// Kafka consumer
-	c := consumer.NewTradeConsumer(cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID, settler)
-
+	pub := publisher.NewTradePublisher(cfg.KafkaBrokers, cfg.KafkaSettledTopic)
+	defer pub.Close()
+	consumer := consumer.NewTradeConsumer(cfg.KafkaBrokers, cfg.KafkaTopic, cfg.KafkaGroupID, settler, pub)
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- c.Run(rootCtx)
+		errCh <- consumer.Run(rootCtx)
 	}()
 
 	select {

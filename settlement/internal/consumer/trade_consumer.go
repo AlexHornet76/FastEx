@@ -8,15 +8,17 @@ import (
 
 	"github.com/AlexHornet76/FastEx/settlement/internal/events"
 	"github.com/AlexHornet76/FastEx/settlement/internal/settle"
+	"github.com/AlexHornet76/FastEx/settlement/publisher"
 	"github.com/segmentio/kafka-go"
 )
 
 type TradeConsumer struct {
-	reader  *kafka.Reader
-	settler *settle.Settler
+	reader    *kafka.Reader
+	settler   *settle.Settler
+	publisher *publisher.TradePublisher
 }
 
-func NewTradeConsumer(brokers []string, topic string, groupID string, settler *settle.Settler) *TradeConsumer {
+func NewTradeConsumer(brokers []string, topic string, groupID string, settler *settle.Settler, pub *publisher.TradePublisher) *TradeConsumer {
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  brokers,
 		Topic:    topic,
@@ -26,7 +28,7 @@ func NewTradeConsumer(brokers []string, topic string, groupID string, settler *s
 		MaxWait:  500 * time.Millisecond,
 	})
 
-	return &TradeConsumer{reader: r, settler: settler}
+	return &TradeConsumer{reader: r, settler: settler, publisher: pub}
 }
 
 func (c *TradeConsumer) Run(ctx context.Context) error {
@@ -60,8 +62,17 @@ func (c *TradeConsumer) Run(ctx context.Context) error {
 				"price", ev.Price,
 				"kafka_partition", msg.Partition,
 				"kafka_offset", msg.Offset)
+
+			// publish settled only for ACCEPTED trades
+			if c.publisher != nil {
+				if err := c.publisher.PublishSettled(ctx, &ev); err != nil {
+					// returning error => retry (at-least-once). ok; downstream should be idempotent.
+					return err
+				}
+			}
+
 		} else {
-			slog.Info("trade skipped (already processed)",
+			slog.Info("trade skipped or rejected (not publishing settled)",
 				"trade_id", ev.TradeID,
 				"kafka_partition", msg.Partition,
 				"kafka_offset", msg.Offset)

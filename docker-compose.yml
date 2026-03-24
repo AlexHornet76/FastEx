@@ -136,6 +136,7 @@ services:
       kafka-topics --bootstrap-server ${KAFKA_BROKERS} --create --if-not-exists --topic ${KAFKA_TOPIC_ORDER_PLACED} --partitions ${KAFKA_TOPIC_PARTITIONS} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR};
       kafka-topics --bootstrap-server ${KAFKA_BROKERS} --create --if-not-exists --topic ${KAFKA_TOPIC_TRADE_EXECUTED} --partitions ${KAFKA_TOPIC_PARTITIONS} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR};
       kafka-topics --bootstrap-server ${KAFKA_BROKERS} --create --if-not-exists --topic ${KAFKA_TOPIC_ORDER_CANCELED} --partitions ${KAFKA_TOPIC_PARTITIONS} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR};
+      kafka-topics --bootstrap-server ${KAFKA_BROKERS} --create --if-not-exists --topic ${KAFKA_TOPIC_TRADE_SETTLED} --partitions ${KAFKA_TOPIC_PARTITIONS} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR};
       echo 'Kafka topics ensured.';
       "
 
@@ -172,6 +173,7 @@ services:
       KAFKA_BROKERS: ${KAFKA_BROKERS}
       KAFKA_TOPIC: ${KAFKA_TOPIC_TRADE_EXECUTED}
       KAFKA_GROUP_ID: ${KAFKA_GROUP_ID}
+      KAFKA_SETTLED_TOPIC: ${KAFKA_TOPIC_TRADE_SETTLED}
 
       SETTLEMENT_PORT: ${SETTLEMENT_PORT}
     healthcheck:
@@ -199,7 +201,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL}
       MARKETDATA_PORT: ${MARKETDATA_PORT}
       KAFKA_BROKERS: ${KAFKA_BROKERS}
-      KAFKA_TOPIC: ${KAFKA_TOPIC_TRADE_EXECUTED}
+      KAFKA_TOPIC: ${KAFKA_TOPIC_TRADE_SETTLED}
       KAFKA_GROUP_ID: ${MARKETDATA_KAFKA_GROUP_ID}
       KAFKA_GROUP_ID_MARKET_WS: ${KAFKA_GROUP_ID_MARKET_WS}
     depends_on:
