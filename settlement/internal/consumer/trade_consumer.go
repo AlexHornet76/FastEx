@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/AlexHornet76/FastEx/settlement/internal/events"
+	"github.com/AlexHornet76/FastEx/settlement/internal/publisher"
 	"github.com/AlexHornet76/FastEx/settlement/internal/settle"
-	"github.com/AlexHornet76/FastEx/settlement/publisher"
 	"github.com/segmentio/kafka-go"
 )
 

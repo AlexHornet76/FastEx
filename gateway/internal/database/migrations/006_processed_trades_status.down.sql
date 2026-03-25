@@ -1,3 +1,0 @@
-ALTER TABLE processed_trades
-DROP COLUMN IF EXISTS reason,
-DROP COLUMN IF EXISTS status;

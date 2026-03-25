@@ -36,7 +36,7 @@ func Load() *Config {
 		PostgresPort:     getEnvInt("POSTGRES_PORT", 5432),
 		PostgresUser:     getEnv("POSTGRES_USER", "exchangeuser"),
 		PostgresPassword: getEnv("POSTGRES_PASSWORD", "securepassword"),
-		PostgresDB:       getEnv("POSTGRES_DB", "exchangedb"),
+		PostgresDB:       getEnv("SETTLEMENT_POSTGRES_DB", "settlementdb"),
 		PostgresSSLMode:  getEnv("POSTGRES_SSLMODE", "disable"),
 
 		KafkaBrokers:      parseCSV(getEnv("KAFKA_BROKERS", "localhost:29092")),

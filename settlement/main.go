@@ -44,6 +44,12 @@ func main() {
 		os.Exit(1)
 	}
 	defer database.Close()
+
+	if err := db.RunMigrations(dbCtx, database.Pool); err != nil {
+		slog.Error("failed to run migrations", "error", err)
+		os.Exit(1)
+	}
+
 	slog.Info("connected to postgres")
 
 	// HTTP health

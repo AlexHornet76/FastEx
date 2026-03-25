@@ -40,7 +40,7 @@ func Load() (*Config, error) {
 		PostgresPort:           getEnv("POSTGRES_PORT", "5432"),
 		PostgresUser:           getEnv("POSTGRES_USER", "exchangeuser"),
 		PostgresPassword:       getEnv("POSTGRES_PASSWORD", "securepassword"),
-		PostgresDB:             getEnv("POSTGRES_DB", "exchangedb"),
+		PostgresDB:             getEnv("GATEWAY_POSTGRES_DB", "gatewaydb"),
 		PostgresSSLMode:        getEnv("POSTGRES_SSLMODE", "disable"),
 		JWTSecret:              getEnv("JWT_SECRET", ""),
 		JWTExpiryMinutes:       getEnvInt("JWT_EXPIRY_MINUTES", 15),
