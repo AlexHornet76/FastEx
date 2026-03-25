@@ -20,6 +20,8 @@ func NewServer(db *pgxpool.Pool) *Server {
 func (s *Server) Router() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", s.health)
+	tradeAPI := NewTradeAPI(s.db)
+	mux.HandleFunc("GET /trades", tradeAPI.GetTrades)
 	return mux
 }
 

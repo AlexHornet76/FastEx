@@ -27,6 +27,7 @@ type Config struct {
 	KafkaTopicTradeSettled string
 	KafkaGroupIDMarketWS   string
 	MarketDataURL          string
+	SettlementURL          string
 }
 
 // Load reads configuration from environment variables
@@ -52,6 +53,7 @@ func Load() (*Config, error) {
 		KafkaTopicTradeSettled: getEnv("KAFKA_TOPIC_TRADE_SETTLED", "trade.settled"),
 		KafkaGroupIDMarketWS:   getEnv("KAFKA_GROUP_ID_MARKET_WS", "gateway-market-ws"),
 		MarketDataURL:          getEnv("MARKETDATA_URL", "http://localhost:8091"),
+		SettlementURL:          getEnv("SETTLEMENT_URL", "http://localhost:8090"),
 	}
 
 	// Validate JWT secret

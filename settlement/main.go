@@ -14,8 +14,8 @@ import (
 	"github.com/AlexHornet76/FastEx/settlement/internal/config"
 	"github.com/AlexHornet76/FastEx/settlement/internal/consumer"
 	"github.com/AlexHornet76/FastEx/settlement/internal/db"
+	"github.com/AlexHornet76/FastEx/settlement/internal/publisher"
 	"github.com/AlexHornet76/FastEx/settlement/internal/settle"
-	"github.com/AlexHornet76/FastEx/settlement/publisher"
 )
 
 func main() {

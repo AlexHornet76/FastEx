@@ -85,6 +85,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	settlementProxy, err := handlers.NewSettlementProxyHandler(cfg.SettlementURL)
+	if err != nil {
+		slog.Error("invalid SETTLEMENT_URL", "error", err, "value", cfg.SettlementURL)
+		os.Exit(1)
+	}
+
 	// ---- Kafka consumer for global market WS feed ----
 	// IMPORTANT: read from trade.settled, NOT trade.executed
 	marketConsumer := marketws.NewConsumer(
@@ -115,8 +121,13 @@ func main() {
 	mux.HandleFunc("/ws/market", wsHandler.HandleConnection)
 
 	// Public marketdata snapshot proxy
-	mux.HandleFunc("GET /api/market/ticker/{instrument}", marketProxy.GetTicker)
-	mux.HandleFunc("GET /api/market/candles/{instrument}", marketProxy.GetCandles)
+	mux.HandleFunc("GET /market/ticker/{instrument}", marketProxy.GetTicker)
+	mux.HandleFunc("GET /market/candles/{instrument}", marketProxy.GetCandles)
+
+	// Settlement proxy
+	mux.Handle("GET /trades", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(settlementProxy.GetTrades),
+	))
 
 	// Protected routes (example)
 	mux.Handle("GET /api/user/profile", auth.JWTMiddleware(cfg.JWTSecret)(
