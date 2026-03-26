@@ -90,6 +90,20 @@ func (e *Engine) recoverFromWAL() error {
 
 			delete(orderMap, data.OrderID)
 			ordersCancelled++
+		case wal.TypeOrderFilled:
+			data, err := entry.ParseOrderFilledData()
+			if err != nil {
+				return err
+			}
+			if data.Order == nil {
+				return nil
+			}
+			if data.Order.Instrument != e.instrument {
+				return nil
+			}
+			if o, exists := orderMap[data.Order.OrderID]; exists {
+				o.Status = models.Filled
+			}
 		}
 		return nil
 	})
@@ -168,6 +182,13 @@ func (e *Engine) ProcessOrder(order *models.Order) (*orderbook.MatchResult, erro
 		}
 	} else {
 		order.Status = models.Filled
+		filledEntry, err := wal.NewOrderFilledEntry(0, order)
+		if err != nil {
+			return nil, fmt.Errorf("create order filled WAL entry: %w", err)
+		}
+		if err := e.wal.Append(filledEntry); err != nil {
+			return nil, fmt.Errorf("append order filled to WAL: %w", err)
+		}
 	}
 
 	return result, nil

@@ -15,6 +15,7 @@ const (
 	TypeOrderPlaced   EntryType = "ORDER_PLACED"
 	TypeTradeExecuted EntryType = "TRADE_EXECUTED"
 	TypeOrderCanceled EntryType = "ORDER_CANCELED"
+	TypeOrderFilled   EntryType = "ORDER_FILLED"
 )
 
 // Entry represents a single WAL entry
@@ -40,6 +41,10 @@ type OrderCanceledData struct {
 	Instrument string    `json:"instrument"`
 	Price      int64     `json:"price"` // for efficient removal
 	Timestamp  time.Time `json:"timestamp"`
+}
+
+type OrderFilledData struct {
+	Order *models.Order `json:"order"`
 }
 
 // NewOrderPlacedEntry creates a WAL entry for order placement
@@ -92,6 +97,20 @@ func NewOrderCanceledEntry(seqNum uint64, orderID uuid.UUID, instrument string, 
 	}, nil
 }
 
+func NewOrderFilledEntry(seqNum uint64, order *models.Order) (*Entry, error) {
+	data, err := json.Marshal(OrderFilledData{Order: order})
+	if err != nil {
+		return nil, err
+	}
+
+	return &Entry{
+		SequenceNum: seqNum,
+		Timestamp:   time.Now(),
+		Type:        TypeOrderFilled,
+		Data:        data,
+	}, nil
+}
+
 // ParseOrderPlacedData extracts order from entry
 func (e *Entry) ParseOrderPlacedData() (*OrderPlacedData, error) {
 	var data OrderPlacedData
@@ -113,6 +132,14 @@ func (e *Entry) ParseTradeExecutedData() (*TradeExecutedData, error) {
 // ParseOrderCanceledData extracts cancellation info from entry
 func (e *Entry) ParseOrderCanceledData() (*OrderCanceledData, error) {
 	var data OrderCanceledData
+	if err := json.Unmarshal(e.Data, &data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (e *Entry) ParseOrderFilledData() (*OrderFilledData, error) {
+	var data OrderFilledData
 	if err := json.Unmarshal(e.Data, &data); err != nil {
 		return nil, err
 	}

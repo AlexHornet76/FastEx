@@ -10,6 +10,7 @@ const (
 	TopicOrderPlaced   = "order.placed"
 	TopicTradeExecuted = "trade.executed"
 	TopicOrderCanceled = "order.canceled"
+	TopicOrderFilled   = "order.filled"
 )
 
 type OrderPlacedEvent struct {
@@ -25,6 +26,21 @@ type OrderPlacedEvent struct {
 	Quantity  int64     `json:"quantity"`
 	FilledQty int64     `json:"filled_qty"`
 	Status    string    `json:"status"`
+}
+
+type OrderFilledEvent struct {
+	EventType  string    `json:"event_type"`
+	EventTime  time.Time `json:"event_time"`
+	Instrument string    `json:"instrument"`
+
+	OrderID   uuid.UUID `json:"order_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Side      string    `json:"side"`
+	Type      string    `json:"type"`
+	Price     int64     `json:"price"`
+	Quantity  int64     `json:"quantity"`
+	FilledQty int64     `json:"filled_qty"`
+	Status    string    `json:"status"` // "FILLED"
 }
 
 type TradeExecutedEvent struct {

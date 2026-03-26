@@ -25,6 +25,7 @@ func NewProducer(brokers []string) (*Producer, error) {
 	p.writers[TopicOrderPlaced] = newWriter(brokers, TopicOrderPlaced)
 	p.writers[TopicTradeExecuted] = newWriter(brokers, TopicTradeExecuted)
 	p.writers[TopicOrderCanceled] = newWriter(brokers, TopicOrderCanceled)
+	p.writers[TopicOrderFilled] = newWriter(brokers, TopicOrderFilled)
 	return p, nil
 }
 

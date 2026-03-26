@@ -12,6 +12,7 @@ type MatchResult struct {
 	Trades       []*models.Trade // generated trades
 	RemainingQty int64           // quantity not matched
 	FullyFilled  bool            // whether the order was fully filled
+	FilledOrders []*models.Order // resting orders that became FILLED during this match
 }
 
 // MatchOrder attempts to match an incoming order against the order book
@@ -24,6 +25,7 @@ func (ob *OrderBook) MatchOrder(incomingOrder *models.Order) *MatchResult {
 		Trades:       make([]*models.Trade, 0),
 		RemainingQty: incomingOrder.Quantity,
 		FullyFilled:  false,
+		FilledOrders: make([]*models.Order, 0),
 	}
 
 	// Determine which side to match against
@@ -57,8 +59,9 @@ func (ob *OrderBook) MatchOrder(incomingOrder *models.Order) *MatchResult {
 		}
 
 		// Match against orders at this price level
-		matched := ob.matchAtPriceLevel(incomingOrder, priceLevel, &result.RemainingQty)
-		result.Trades = append(result.Trades, matched...)
+		matchedTrades, filledResting := ob.matchAtPriceLevel(incomingOrder, priceLevel, &result.RemainingQty)
+		result.Trades = append(result.Trades, matchedTrades...)
+		result.FilledOrders = append(result.FilledOrders, filledResting...) 
 
 		if priceLevel.IsEmpty() {
 			delete(oppositeSide.priceLevels, bestPrice)
@@ -88,9 +91,10 @@ func (ob *OrderBook) matchAtPriceLevel(
 	incomingOrder *models.Order,
 	priceLevel *PriceLevel,
 	remainingQty *int64,
-) []*models.Trade {
+) ([]*models.Trade, []*models.Order) { // return filled resting orders too
 
 	trades := make([]*models.Trade, 0)
+	filledOrders := make([]*models.Order, 0) 
 
 	// Iterate through orders at this price level (FIFO)
 	for *remainingQty > 0 && !priceLevel.IsEmpty() {
@@ -114,15 +118,19 @@ func (ob *OrderBook) matchAtPriceLevel(
 		// Update order statuses
 		if restingOrder.IsFilled() {
 			restingOrder.Status = models.Filled
+
+			// track resting orders that became filled so Engine can WAL-log them
+			filledOrders = append(filledOrders, restingOrder)
+
 			// Remove from price level
 			priceLevel.RemoveOrder(restingOrder.OrderID)
 			delete(ob.orders, restingOrder.OrderID)
 		} else {
 			restingOrder.Status = models.Partial
 		}
-
 	}
-	return trades
+
+	return trades, filledOrders
 }
 
 // createTrade creates a trade record
@@ -155,10 +163,3 @@ func (ob *OrderBook) createTrade(
 
 	return trade
 }
-
-// func min(a, b int64) int64 {
-// 	if a < b {
-// 		return a
-// 	}
-// 	return b
-// }

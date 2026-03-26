@@ -137,6 +137,7 @@ services:
       kafka-topics --bootstrap-server ${KAFKA_BROKERS} --create --if-not-exists --topic ${KAFKA_TOPIC_TRADE_EXECUTED} --partitions ${KAFKA_TOPIC_PARTITIONS} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR};
       kafka-topics --bootstrap-server ${KAFKA_BROKERS} --create --if-not-exists --topic ${KAFKA_TOPIC_ORDER_CANCELED} --partitions ${KAFKA_TOPIC_PARTITIONS} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR};
       kafka-topics --bootstrap-server ${KAFKA_BROKERS} --create --if-not-exists --topic ${KAFKA_TOPIC_TRADE_SETTLED} --partitions ${KAFKA_TOPIC_PARTITIONS} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR};
+      kafka-topics --bootstrap-server ${KAFKA_BROKERS} --create --if-not-exists --topic ${KAFKA_TOPIC_ORDER_FILLED} --partitions ${KAFKA_TOPIC_PARTITIONS} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR};
       echo 'Kafka topics ensured.';
       "
 

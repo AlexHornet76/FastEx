@@ -129,6 +129,9 @@ func main() {
 		http.HandlerFunc(settlementProxy.GetTrades),
 	))
 
+	// Order notifications
+	mux.HandleFunc("/ws/orders", wsHandler.HandleConnection)
+
 	// Protected routes (example)
 	mux.Handle("GET /api/user/profile", auth.JWTMiddleware(cfg.JWTSecret)(
 		http.HandlerFunc(authHandler.GetProfile),

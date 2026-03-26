@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/AlexHornet76/FastEx/engine/internal/wal"
@@ -95,6 +96,25 @@ func (p *WALPublisher) PublishOnce(ctx context.Context, walPath string, lastSeq 
 
 			if err := p.producer.PublishJSON(ctx, TopicOrderPlaced, p.instrument, ev); err != nil {
 				return err
+			}
+
+			if strings.EqualFold(ev.Status, "FILLED") {
+				filled := OrderFilledEvent{
+					EventType:  TopicOrderFilled,
+					EventTime:  e.Timestamp.UTC(),
+					Instrument: data.Order.Instrument,
+					OrderID:    data.Order.OrderID,
+					UserID:     data.Order.UserID,
+					Side:       string(data.Order.Side),
+					Type:       string(data.Order.Type),
+					Price:      data.Order.Price,
+					Quantity:   data.Order.Quantity,
+					FilledQty:  data.Order.FilledQty,
+					Status:     "FILLED",
+				}
+				if err := p.producer.PublishJSON(ctx, TopicOrderFilled, p.instrument, filled); err != nil {
+					return err
+				}
 			}
 
 		case wal.TypeTradeExecuted:

@@ -10,9 +10,12 @@ import (
 )
 
 type WebSocketHandler struct {
-	upgrader  *websocket.Upgrader
-	jwtSecret string
-	clients   sync.Map // map[*websocket.Conn]*ClientInfo
+	upgrader      *websocket.Upgrader
+	jwtSecret     string
+	clientsByConn sync.Map // map[*websocket.Conn]*ClientInfo
+	// user_id -> *sync.Map of conn -> struct{}
+	// (sync.Map used to avoid coarse locking)
+	connsByUser sync.Map // map[string]*sync.Map
 }
 
 type ClientInfo struct {
@@ -41,7 +44,7 @@ func (h *WebSocketHandler) HandleConnection(w http.ResponseWriter, r *http.Reque
 
 func (h *WebSocketHandler) handleMessages(conn *websocket.Conn) {
 	defer func() {
-		h.clients.Delete(conn)
+		h.removeConn(conn)
 		_ = conn.Close()
 		slog.Debug("websocket connection closed")
 	}()
@@ -88,7 +91,7 @@ func (h *WebSocketHandler) handleMessages(conn *websocket.Conn) {
 				Username: claims.Username,
 				Conn:     conn,
 			}
-			h.clients.Store(conn, &clientInfo)
+			h.addConn(&clientInfo)
 			authenticated = true
 
 			_ = conn.WriteJSON(map[string]any{
@@ -99,12 +102,12 @@ func (h *WebSocketHandler) handleMessages(conn *websocket.Conn) {
 			continue
 		}
 
-		// global feed
+		// /ws/market and /ws/orders are server-push feeds.
 		if !authenticated {
 			h.sendError(conn, "authentication required")
 			continue
 		}
-		h.sendError(conn, "unsupported message type (global feed)")
+		h.sendError(conn, "unsupported message type (server push only)")
 	}
 }
 
@@ -115,12 +118,63 @@ func (h *WebSocketHandler) sendError(conn *websocket.Conn, message string) {
 	})
 }
 
+func (h *WebSocketHandler) addConn(ci *ClientInfo) {
+	h.clientsByConn.Store(ci.Conn, ci)
+
+	// get or create per-user conn set
+	v, _ := h.connsByUser.LoadOrStore(ci.UserID, &sync.Map{})
+	set := v.(*sync.Map)
+	set.Store(ci.Conn, struct{}{})
+}
+
+func (h *WebSocketHandler) removeConn(conn *websocket.Conn) {
+	v, ok := h.clientsByConn.Load(conn)
+	if ok {
+		ci := v.(*ClientInfo)
+
+		// remove from per-user set
+		if sv, ok := h.connsByUser.Load(ci.UserID); ok {
+			set := sv.(*sync.Map)
+			set.Delete(conn)
+
+			// cleanup empty set
+			empty := true
+			set.Range(func(_, _ any) bool {
+				empty = false
+				return false
+			})
+			if empty {
+				h.connsByUser.Delete(ci.UserID)
+			}
+		}
+	}
+
+	h.clientsByConn.Delete(conn)
+}
+
 // Broadcast sends a message to ALL authenticated WS clients.
 func (h *WebSocketHandler) Broadcast(message any) {
-	h.clients.Range(func(_, v any) bool {
+	h.clientsByConn.Range(func(_, v any) bool {
 		client := v.(*ClientInfo)
 		if err := client.Conn.WriteJSON(message); err != nil {
 			slog.Error("broadcast failed", "user_id", client.UserID, "error", err)
+		}
+		return true
+	})
+}
+
+// SendToUser sends a message to ALL active WS connections of a specific user.
+func (h *WebSocketHandler) SendToUser(userID string, message any) {
+	sv, ok := h.connsByUser.Load(userID)
+	if !ok {
+		return
+	}
+	set := sv.(*sync.Map)
+
+	set.Range(func(k, _ any) bool {
+		conn := k.(*websocket.Conn)
+		if err := conn.WriteJSON(message); err != nil {
+			slog.Error("send to user failed", "user_id", userID, "error", err)
 		}
 		return true
 	})
