@@ -17,6 +17,7 @@ import (
 	"github.com/AlexHornet76/FastEx/gateway/internal/logger"
 	"github.com/AlexHornet76/FastEx/gateway/internal/marketws"
 	"github.com/AlexHornet76/FastEx/gateway/internal/matching"
+	"github.com/AlexHornet76/FastEx/gateway/internal/orderws"
 	"github.com/gorilla/websocket"
 )
 
@@ -91,8 +92,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// ---- Kafka consumer for global market WS feed ----
-	// IMPORTANT: read from trade.settled, NOT trade.executed
+	// ---- Kafka consumer for global market WS feed ---
 	marketConsumer := marketws.NewConsumer(
 		cfg.KafkaBrokers,
 		cfg.KafkaTopicTradeSettled,
@@ -103,6 +103,21 @@ func main() {
 	go func() {
 		if err := marketConsumer.Run(rootCtx); err != nil && err != context.Canceled {
 			slog.Error("marketws consumer stopped", "error", err)
+			stop()
+		}
+	}()
+	orderConsumer := orderws.NewConsumer(
+		cfg.KafkaBrokers,
+		cfg.KafkaTopicOrderPlaced,
+		cfg.KafkaTopicOrderCanceled,
+		cfg.KafkaTopicOrderFilled,
+		cfg.KafkaGroupIDOrderWS,
+		wsHandler,
+	)
+
+	go func() {
+		if err := orderConsumer.Run(rootCtx); err != nil && err != context.Canceled {
+			slog.Error("orderws consumer stopped", "error", err)
 			stop()
 		}
 	}()

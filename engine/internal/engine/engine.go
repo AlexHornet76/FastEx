@@ -171,6 +171,15 @@ func (e *Engine) ProcessOrder(order *models.Order) (*orderbook.MatchResult, erro
 			"seq", tradeEntry.SequenceNum)
 	}
 
+	for _, filledOrder := range result.FilledOrders {
+		filledEntry, err := wal.NewOrderFilledEntry(0, filledOrder)
+		if err != nil {
+			return nil, fmt.Errorf("create filled WAL entry: %w", err)
+		}
+		if err := e.wal.Append(filledEntry); err != nil {
+			return nil, fmt.Errorf("append filled to WAL: %w", err)
+		}
+	}
 	// Step 4: Add remaining to book (if any)
 	if !result.FullyFilled && result.RemainingQty > 0 {
 		order.Status = models.Open

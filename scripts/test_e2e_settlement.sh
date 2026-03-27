@@ -5,13 +5,14 @@ ENGINE_URL="${ENGINE_URL:-http://localhost:8081}"
 
 POSTGRES_CONTAINER="${POSTGRES_CONTAINER:-postgres}"
 POSTGRES_USER="${POSTGRES_USER:-exchangeuser}"
-POSTGRES_DB="${POSTGRES_DB:-settlementdb}"
+GATEWAY_DB="${GATEWAY_DB:-gatewaydb}"
+SETTLEMENT_DB="${SETTLEMENT_DB:-settlementdb}"
 
 KAFKA_CONTAINER="${KAFKA_CONTAINER:-kafka}"
 KAFKA_BROKER="${KAFKA_BROKER:-kafka:9092}"
 KAFKA_TOPIC="${KAFKA_TOPIC:-trade.executed}"
 
-SELLER_ID="${SELLER_ID:-cd17cdce-5bc6-419d-88dc-6584c60b26e8}"
+SELLER_ID="${SELLER_ID:-89ca21f8-d5e2-4e1c-879b-9ac8db8cf7d9}"
 BUYER1_ID="${BUYER1_ID:-22222222-2222-2222-2222-222222222222}"
 BUYER2_ID="${BUYER2_ID:-33333333-3333-3333-3333-333333333333}"
 
@@ -42,7 +43,7 @@ http_post_order() {
 }
 
 psql_exec() {
-  docker exec -i "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -qAt -c "$1"
+  docker exec -i "$POSTGRES_CONTAINER" psql -U "$POSTGRES_USER" -d "$SETTLEMENT_DB" -v ON_ERROR_STOP=1 -qAt -c "$1"
 }
 
 fund_balance() {

@@ -166,6 +166,32 @@ func (p *WALPublisher) PublishOnce(ctx context.Context, walPath string, lastSeq 
 			if err := p.producer.PublishJSON(ctx, TopicOrderCanceled, p.instrument, ev); err != nil {
 				return err
 			}
+		case wal.TypeOrderFilled:
+			data, err := e.ParseOrderFilledData()
+			if err != nil {
+				return err
+			}
+			if data.Order == nil || data.Order.Instrument != p.instrument {
+				return nil
+			}
+
+			ev := OrderFilledEvent{
+				EventType:  TopicOrderFilled,
+				EventTime:  e.Timestamp.UTC(),
+				Instrument: data.Order.Instrument,
+				OrderID:    data.Order.OrderID,
+				UserID:     data.Order.UserID,
+				Side:       string(data.Order.Side),
+				Type:       string(data.Order.Type),
+				Price:      data.Order.Price,
+				Quantity:   data.Order.Quantity,
+				FilledQty:  data.Order.FilledQty,
+				Status:     "FILLED",
+			}
+
+			if err := p.producer.PublishJSON(ctx, TopicOrderFilled, p.instrument, ev); err != nil {
+				return err
+			}
 		default:
 			// ignore unknown types
 		}
