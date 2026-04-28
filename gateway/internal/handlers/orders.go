@@ -98,7 +98,7 @@ func (h *OrderHandler) SubmitOrder(w http.ResponseWriter, r *http.Request) {
 		Quantity:   req.Quantity,
 	}
 
-	result, err := h.matchingClient.SubmitOrder(matchingReq)
+	result, err := h.matchingClient.SubmitOrder(r.Context(), matchingReq)
 	if err != nil {
 		slog.Error("matching engine request failed",
 			"user_id", claims.UserID,
@@ -152,7 +152,7 @@ func (h *OrderHandler) CancelOrder(w http.ResponseWriter, r *http.Request) {
 		"instrument", instrument)
 
 	// Forward to matching engine
-	if err := h.matchingClient.CancelOrder(orderID, instrument); err != nil {
+	if err := h.matchingClient.CancelOrder(r.Context(), orderID, instrument); err != nil {
 		slog.Error("cancel order failed",
 			"user_id", claims.UserID,
 			"order_id", orderID,

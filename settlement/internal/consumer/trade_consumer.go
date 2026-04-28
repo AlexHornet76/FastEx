@@ -43,30 +43,30 @@ func (c *TradeConsumer) Run(ctx context.Context) error {
 		var ev events.TradeExecutedEvent
 		if err := json.Unmarshal(msg.Value, &ev); err != nil {
 			slog.Error("failed to unmarshal trade event", "error", err, "value", string(msg.Value))
-			// For now: skip bad messages (don't crash loop)
 			continue
 		}
 
 		applied, err := c.settler.ApplyTrade(ctx, &ev)
 		if err != nil {
-			slog.Error("failed to apply trade", "trade_id", ev.TradeID, "error", err)
-			// Important: returning error will cause consumer restart and retry (at-least-once).
+			slog.Error("failed to apply trade",
+				"trade_id", ev.TradeID,
+				"correlation_id", ev.CorrelationID,
+				"error", err)
 			return err
 		}
 
 		if applied {
 			slog.Info("trade applied",
 				"trade_id", ev.TradeID,
+				"correlation_id", ev.CorrelationID, // NEW
 				"instrument", ev.Instrument,
 				"qty", ev.Quantity,
 				"price", ev.Price,
 				"kafka_partition", msg.Partition,
 				"kafka_offset", msg.Offset)
 
-			// publish settled only for ACCEPTED trades
 			if c.publisher != nil {
 				if err := c.publisher.PublishSettled(ctx, &ev); err != nil {
-					// returning error => retry (at-least-once). ok; downstream should be idempotent.
 					return err
 				}
 			}
@@ -74,6 +74,7 @@ func (c *TradeConsumer) Run(ctx context.Context) error {
 		} else {
 			slog.Info("trade skipped or rejected (not publishing settled)",
 				"trade_id", ev.TradeID,
+				"correlation_id", ev.CorrelationID, // NEW
 				"kafka_partition", msg.Partition,
 				"kafka_offset", msg.Offset)
 		}

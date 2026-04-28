@@ -61,6 +61,7 @@ func (p *TradePublisher) PublishSettled(ctx context.Context, ev *events.TradeExe
 		"topic", p.topic,
 		"instrument", out.Instrument,
 		"trade_id", out.TradeID,
+		"correlation_id", out.CorrelationID,
 	)
 	return nil
 }

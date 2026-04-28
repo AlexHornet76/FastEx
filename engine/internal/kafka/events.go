@@ -18,14 +18,15 @@ type OrderPlacedEvent struct {
 	EventTime  time.Time `json:"event_time"`
 	Instrument string    `json:"instrument"`
 
-	OrderID   uuid.UUID `json:"order_id"`
-	UserID    uuid.UUID `json:"user_id"`
-	Side      string    `json:"side"`
-	Type      string    `json:"type"`
-	Price     int64     `json:"price"`
-	Quantity  int64     `json:"quantity"`
-	FilledQty int64     `json:"filled_qty"`
-	Status    string    `json:"status"`
+	OrderID       uuid.UUID `json:"order_id"`
+	UserID        uuid.UUID `json:"user_id"`
+	Side          string    `json:"side"`
+	Type          string    `json:"type"`
+	Price         int64     `json:"price"`
+	Quantity      int64     `json:"quantity"`
+	FilledQty     int64     `json:"filled_qty"`
+	Status        string    `json:"status"`
+	CorrelationID string    `json:"correlation_id"`
 }
 
 type OrderFilledEvent struct {
@@ -33,14 +34,15 @@ type OrderFilledEvent struct {
 	EventTime  time.Time `json:"event_time"`
 	Instrument string    `json:"instrument"`
 
-	OrderID   uuid.UUID `json:"order_id"`
-	UserID    uuid.UUID `json:"user_id"`
-	Side      string    `json:"side"`
-	Type      string    `json:"type"`
-	Price     int64     `json:"price"`
-	Quantity  int64     `json:"quantity"`
-	FilledQty int64     `json:"filled_qty"`
-	Status    string    `json:"status"` // "FILLED"
+	OrderID       uuid.UUID `json:"order_id"`
+	UserID        uuid.UUID `json:"user_id"`
+	Side          string    `json:"side"`
+	Type          string    `json:"type"`
+	Price         int64     `json:"price"`
+	Quantity      int64     `json:"quantity"`
+	FilledQty     int64     `json:"filled_qty"`
+	Status        string    `json:"status"` // "FILLED"
+	CorrelationID string    `json:"correlation_id"`
 }
 
 type TradeExecutedEvent struct {
@@ -48,13 +50,14 @@ type TradeExecutedEvent struct {
 	EventTime  time.Time `json:"event_time"`
 	Instrument string    `json:"instrument"`
 
-	TradeID      uuid.UUID `json:"trade_id"`
-	BuyOrderID   uuid.UUID `json:"buy_order_id"`
-	SellOrderID  uuid.UUID `json:"sell_order_id"`
-	BuyerUserID  uuid.UUID `json:"buyer_user_id"`
-	SellerUserID uuid.UUID `json:"seller_user_id"`
-	Price        int64     `json:"price"`
-	Quantity     int64     `json:"quantity"`
+	TradeID       uuid.UUID `json:"trade_id"`
+	BuyOrderID    uuid.UUID `json:"buy_order_id"`
+	SellOrderID   uuid.UUID `json:"sell_order_id"`
+	BuyerUserID   uuid.UUID `json:"buyer_user_id"`
+	SellerUserID  uuid.UUID `json:"seller_user_id"`
+	Price         int64     `json:"price"`
+	Quantity      int64     `json:"quantity"`
+	CorrelationID string    `json:"correlation_id"`
 }
 
 type OrderCanceledEvent struct {
@@ -62,6 +65,7 @@ type OrderCanceledEvent struct {
 	EventTime  time.Time `json:"event_time"`
 	Instrument string    `json:"instrument"`
 
-	OrderID uuid.UUID `json:"order_id"`
-	Price   int64     `json:"price"`
+	OrderID       uuid.UUID `json:"order_id"`
+	Price         int64     `json:"price"`
+	CorrelationID string    `json:"correlation_id"`
 }

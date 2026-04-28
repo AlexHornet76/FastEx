@@ -2,12 +2,14 @@ package matching
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	"github.com/AlexHornet76/FastEx/gateway/internal/middleware"
 	"github.com/google/uuid"
 )
 
@@ -86,17 +88,24 @@ type ErrorResponse struct {
 }
 
 // SubmitOrder submits an order to the matching engine
-func (c *Client) SubmitOrder(req SubmitOrderRequest) (*SubmitOrderResponse, error) {
+func (c *Client) SubmitOrder(ctx context.Context, req SubmitOrderRequest) (*SubmitOrderResponse, error) {
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
-	resp, err := c.httpClient.Post(
-		c.baseURL+"/orders",
-		"application/json",
-		bytes.NewBuffer(jsonData),
-	)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/orders", bytes.NewReader(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	// propagate request id
+	if rid := middleware.GetRequestID(ctx); rid != "" {
+		httpReq.Header.Set("X-Request-ID", rid)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("http request: %w", err)
 	}
@@ -126,12 +135,17 @@ func (c *Client) SubmitOrder(req SubmitOrderRequest) (*SubmitOrderResponse, erro
 }
 
 // CancelOrder cancels an order
-func (c *Client) CancelOrder(orderID uuid.UUID, instrument string) error {
+func (c *Client) CancelOrder(ctx context.Context, orderID uuid.UUID, instrument string) error {
 	url := fmt.Sprintf("%s/orders/%s?instrument=%s", c.baseURL, orderID.String(), instrument)
 
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
+	}
+
+	// propagate request id
+	if rid := middleware.GetRequestID(ctx); rid != "" {
+		req.Header.Set("X-Request-ID", rid)
 	}
 
 	resp, err := c.httpClient.Do(req)

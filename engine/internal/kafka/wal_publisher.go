@@ -81,17 +81,18 @@ func (p *WALPublisher) PublishOnce(ctx context.Context, walPath string, lastSeq 
 			}
 
 			ev := OrderPlacedEvent{
-				EventType:  TopicOrderPlaced,
-				EventTime:  e.Timestamp.UTC(),
-				Instrument: data.Order.Instrument,
-				OrderID:    data.Order.OrderID,
-				UserID:     data.Order.UserID,
-				Side:       string(data.Order.Side),
-				Type:       string(data.Order.Type),
-				Price:      data.Order.Price,
-				Quantity:   data.Order.Quantity,
-				FilledQty:  data.Order.FilledQty,
-				Status:     string(data.Order.Status),
+				EventType:     TopicOrderPlaced,
+				EventTime:     e.Timestamp.UTC(),
+				Instrument:    data.Order.Instrument,
+				OrderID:       data.Order.OrderID,
+				UserID:        data.Order.UserID,
+				Side:          string(data.Order.Side),
+				Type:          string(data.Order.Type),
+				Price:         data.Order.Price,
+				Quantity:      data.Order.Quantity,
+				FilledQty:     data.Order.FilledQty,
+				Status:        string(data.Order.Status),
+				CorrelationID: data.Order.CorrelationID,
 			}
 
 			if err := p.producer.PublishJSON(ctx, TopicOrderPlaced, p.instrument, ev); err != nil {
@@ -100,17 +101,18 @@ func (p *WALPublisher) PublishOnce(ctx context.Context, walPath string, lastSeq 
 
 			if strings.EqualFold(ev.Status, "FILLED") {
 				filled := OrderFilledEvent{
-					EventType:  TopicOrderFilled,
-					EventTime:  e.Timestamp.UTC(),
-					Instrument: data.Order.Instrument,
-					OrderID:    data.Order.OrderID,
-					UserID:     data.Order.UserID,
-					Side:       string(data.Order.Side),
-					Type:       string(data.Order.Type),
-					Price:      data.Order.Price,
-					Quantity:   data.Order.Quantity,
-					FilledQty:  data.Order.FilledQty,
-					Status:     "FILLED",
+					EventType:     TopicOrderFilled,
+					EventTime:     e.Timestamp.UTC(),
+					Instrument:    data.Order.Instrument,
+					OrderID:       data.Order.OrderID,
+					UserID:        data.Order.UserID,
+					Side:          string(data.Order.Side),
+					Type:          string(data.Order.Type),
+					Price:         data.Order.Price,
+					Quantity:      data.Order.Quantity,
+					FilledQty:     data.Order.FilledQty,
+					Status:        "FILLED",
+					CorrelationID: data.Order.CorrelationID,
 				}
 				if err := p.producer.PublishJSON(ctx, TopicOrderFilled, p.instrument, filled); err != nil {
 					return err
@@ -130,16 +132,17 @@ func (p *WALPublisher) PublishOnce(ctx context.Context, walPath string, lastSeq 
 			}
 
 			ev := TradeExecutedEvent{
-				EventType:    TopicTradeExecuted,
-				EventTime:    e.Timestamp.UTC(),
-				Instrument:   data.Trade.Instrument,
-				TradeID:      data.Trade.TradeID,
-				BuyOrderID:   data.Trade.BuyOrderID,
-				SellOrderID:  data.Trade.SellOrderID,
-				BuyerUserID:  data.Trade.BuyerUserID,
-				SellerUserID: data.Trade.SellerUserID,
-				Price:        data.Trade.Price,
-				Quantity:     data.Trade.Quantity,
+				EventType:     TopicTradeExecuted,
+				EventTime:     e.Timestamp.UTC(),
+				Instrument:    data.Trade.Instrument,
+				TradeID:       data.Trade.TradeID,
+				BuyOrderID:    data.Trade.BuyOrderID,
+				SellOrderID:   data.Trade.SellOrderID,
+				BuyerUserID:   data.Trade.BuyerUserID,
+				SellerUserID:  data.Trade.SellerUserID,
+				Price:         data.Trade.Price,
+				Quantity:      data.Trade.Quantity,
+				CorrelationID: data.Trade.CorrelationID,
 			}
 
 			if err := p.producer.PublishJSON(ctx, TopicTradeExecuted, p.instrument, ev); err != nil {
@@ -176,17 +179,18 @@ func (p *WALPublisher) PublishOnce(ctx context.Context, walPath string, lastSeq 
 			}
 
 			ev := OrderFilledEvent{
-				EventType:  TopicOrderFilled,
-				EventTime:  e.Timestamp.UTC(),
-				Instrument: data.Order.Instrument,
-				OrderID:    data.Order.OrderID,
-				UserID:     data.Order.UserID,
-				Side:       string(data.Order.Side),
-				Type:       string(data.Order.Type),
-				Price:      data.Order.Price,
-				Quantity:   data.Order.Quantity,
-				FilledQty:  data.Order.FilledQty,
-				Status:     "FILLED",
+				EventType:     TopicOrderFilled,
+				EventTime:     e.Timestamp.UTC(),
+				Instrument:    data.Order.Instrument,
+				OrderID:       data.Order.OrderID,
+				UserID:        data.Order.UserID,
+				Side:          string(data.Order.Side),
+				Type:          string(data.Order.Type),
+				Price:         data.Order.Price,
+				Quantity:      data.Order.Quantity,
+				FilledQty:     data.Order.FilledQty,
+				Status:        "FILLED",
+				CorrelationID: data.Order.CorrelationID,
 			}
 
 			if err := p.producer.PublishJSON(ctx, TopicOrderFilled, p.instrument, ev); err != nil {

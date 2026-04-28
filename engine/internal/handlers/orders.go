@@ -46,6 +46,11 @@ func (h *OrderHandler) SubmitOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	requestID := r.Header.Get("X-Request-ID")
+	if requestID != "" {
+		order.CorrelationID = requestID
+	}
+
 	slog.Info("order submitted",
 		"order_id", order.OrderID,
 		"user_id", order.UserID,

@@ -36,17 +36,18 @@ const (
 
 // Order represents a trading order
 type Order struct {
-	OrderID     uuid.UUID   `json:"order_id"`
-	UserID      uuid.UUID   `json:"user_id"`
-	Instrument  string      `json:"instrument"` // BTC, APPL, etc.
-	Side        OrderSide   `json:"side"`       // BUY or SELL
-	Type        OrderType   `json:"type"`       // LIMIT or MARKET
-	Price       int64       `json:"price"`      // Price in smallest unit (cents, satoshis)
-	Quantity    int64       `json:"quantity"`   // Quantity in smallest unit
-	FilledQty   int64       `json:"filled_qty"` // How much has been filled
-	Status      OrderStatus `json:"status"`
-	Timestamp   time.Time   `json:"timestamp"`    // When order was created
-	SequenceNum uint64      `json:"sequence_num"` // For deterministic ordering
+	OrderID       uuid.UUID   `json:"order_id"`
+	UserID        uuid.UUID   `json:"user_id"`
+	Instrument    string      `json:"instrument"` // BTC, APPL, etc.
+	Side          OrderSide   `json:"side"`       // BUY or SELL
+	Type          OrderType   `json:"type"`       // LIMIT or MARKET
+	Price         int64       `json:"price"`      // Price in smallest unit (cents, satoshis)
+	Quantity      int64       `json:"quantity"`   // Quantity in smallest unit
+	FilledQty     int64       `json:"filled_qty"` // How much has been filled
+	Status        OrderStatus `json:"status"`
+	Timestamp     time.Time   `json:"timestamp"`      // When order was created
+	SequenceNum   uint64      `json:"sequence_num"`   // For deterministic ordering
+	CorrelationID string      `json:"correlation_id"` // For tracing across services
 }
 
 // RemainingQuantity returns unfilled quantity
@@ -61,14 +62,15 @@ func (o *Order) IsFilled() bool {
 
 // Trade represents a matched trade between two orders
 type Trade struct {
-	TradeID      uuid.UUID `json:"trade_id"`
-	Instrument   string    `json:"instrument"`
-	BuyOrderID   uuid.UUID `json:"buy_order_id"`
-	SellOrderID  uuid.UUID `json:"sell_order_id"`
-	BuyerUserID  uuid.UUID `json:"buyer_user_id"`
-	SellerUserID uuid.UUID `json:"seller_user_id"`
-	Price        int64     `json:"price"`    // Execution price
-	Quantity     int64     `json:"quantity"` // Executed quantity
-	Timestamp    time.Time `json:"timestamp"`
-	SequenceNum  uint64    `json:"sequence_num"`
+	TradeID       uuid.UUID `json:"trade_id"`
+	Instrument    string    `json:"instrument"`
+	BuyOrderID    uuid.UUID `json:"buy_order_id"`
+	SellOrderID   uuid.UUID `json:"sell_order_id"`
+	BuyerUserID   uuid.UUID `json:"buyer_user_id"`
+	SellerUserID  uuid.UUID `json:"seller_user_id"`
+	Price         int64     `json:"price"`    // Execution price
+	Quantity      int64     `json:"quantity"` // Executed quantity
+	Timestamp     time.Time `json:"timestamp"`
+	SequenceNum   uint64    `json:"sequence_num"`
+	CorrelationID string    `json:"correlation_id"`
 }

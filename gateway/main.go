@@ -17,6 +17,7 @@ import (
 	"github.com/AlexHornet76/FastEx/gateway/internal/logger"
 	"github.com/AlexHornet76/FastEx/gateway/internal/marketws"
 	"github.com/AlexHornet76/FastEx/gateway/internal/matching"
+	"github.com/AlexHornet76/FastEx/gateway/internal/middleware"
 	"github.com/AlexHornet76/FastEx/gateway/internal/orderws"
 	"github.com/gorilla/websocket"
 )
@@ -165,6 +166,9 @@ func main() {
 
 	// Apply CORS middleware
 	handler := corsMiddleware(cfg.CORSAllowedOrigins)(mux)
+
+	// Request ID middleware (X-Request-ID)
+	handler = middleware.RequestID(handler)
 
 	// Apply recovery middleware
 	handler = recoveryMiddleware(handler)
