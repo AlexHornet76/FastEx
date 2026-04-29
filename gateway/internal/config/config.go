@@ -49,7 +49,7 @@ func Load() (*Config, error) {
 		PostgresSSLMode:         getEnv("POSTGRES_SSLMODE", "disable"),
 		JWTSecret:               getEnv("JWT_SECRET", ""),
 		JWTExpiryMinutes:        getEnvInt("JWT_EXPIRY_MINUTES", 15),
-		CORSAllowedOrigins:      strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000"), ","),
+		CORSAllowedOrigins:      strings.Split(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173"), ","),
 		LogLevel:                getEnv("LOG_LEVEL", "info"),
 		ChallengeTTLMinutes:     getEnvInt("CHALLENGE_TTL_MINUTES", 5),
 		MatchingEngineURL:       getEnv("MATCHING_ENGINE_URL", "http://localhost:8081"),
