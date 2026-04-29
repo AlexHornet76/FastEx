@@ -22,6 +22,10 @@ func (s *Server) Router() http.Handler {
 	mux.HandleFunc("GET /health", s.health)
 	tradeAPI := NewTradeAPI(s.db)
 	mux.HandleFunc("GET /trades", tradeAPI.GetTrades)
+	accountAPI := NewAccountAPI(s.db)
+	mux.HandleFunc("GET /balance", accountAPI.GetBalance)
+	mux.HandleFunc("GET /holdings", accountAPI.GetHoldings)
+	mux.HandleFunc("GET /ledger", accountAPI.GetLedger)
 	return mux
 }
 

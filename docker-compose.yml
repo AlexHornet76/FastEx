@@ -46,6 +46,7 @@ services:
       KAFKA_TOPIC_TRADE_EXECUTED: ${KAFKA_TOPIC_TRADE_EXECUTED}
       KAFKA_GROUP_ID_MARKET_WS: ${KAFKA_GROUP_ID_MARKET_WS}
       MARKETDATA_URL: ${MARKETDATA_URL}
+      SETTLEMENT_URL: ${SETTLEMENT_URL}
     depends_on:
       postgres:
         condition: service_healthy

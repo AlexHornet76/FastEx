@@ -71,3 +71,63 @@ func (sph *SettlementProxyHandler) proxyGET(w http.ResponseWriter, r *http.Reque
 	body, _ := io.ReadAll(resp.Body)
 	_, _ = w.Write(body)
 }
+
+// GetBalance proxies GET /balance?user_id=...
+// Public endpoint in gateway: GET /account/balance
+func (sph *SettlementProxyHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetUserFromContext(r)
+	if claims == nil {
+		respondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+		return
+	}
+
+	upstream := *sph.baseURL
+	upstream.Path = "/balance"
+
+	q := r.URL.Query()
+	q.Set("user_id", claims.UserID)
+	upstream.RawQuery = q.Encode()
+
+	slog.Debug("proxying balance request", "user_id", claims.UserID, "upstream", upstream.String())
+	sph.proxyGET(w, r, upstream.String())
+}
+
+// GetHoldings proxies GET /holdings?user_id=...&instrument=...&limit=...&cursor=...
+// Public endpoint in gateway: GET /account/holdings
+func (sph *SettlementProxyHandler) GetHoldings(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetUserFromContext(r)
+	if claims == nil {
+		respondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+		return
+	}
+
+	upstream := *sph.baseURL
+	upstream.Path = "/holdings"
+
+	q := r.URL.Query()
+	q.Set("user_id", claims.UserID)
+	upstream.RawQuery = q.Encode()
+
+	slog.Debug("proxying holdings request", "user_id", claims.UserID, "upstream", upstream.String())
+	sph.proxyGET(w, r, upstream.String())
+}
+
+// GetLedger proxies GET /ledger?user_id=...&limit=...&cursor=...&type=...
+// Public endpoint in gateway: GET /account/ledger
+func (sph *SettlementProxyHandler) GetLedger(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetUserFromContext(r)
+	if claims == nil {
+		respondError(w, http.StatusUnauthorized, "UNAUTHORIZED", "Authentication required")
+		return
+	}
+
+	upstream := *sph.baseURL
+	upstream.Path = "/ledger"
+
+	q := r.URL.Query()
+	q.Set("user_id", claims.UserID)
+	upstream.RawQuery = q.Encode()
+
+	slog.Debug("proxying ledger request", "user_id", claims.UserID, "upstream", upstream.String())
+	sph.proxyGET(w, r, upstream.String())
+}

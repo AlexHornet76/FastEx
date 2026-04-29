@@ -87,7 +87,7 @@ export default function Login({ onSwitchToRegister }) {
    * 6. Save token to localStorage
    * 7. Redirect to dashboard
    */
-  const handleLogin = async (e) => {
+const handleLogin = async (e) => {
   e.preventDefault()
 
   // Validation
@@ -125,15 +125,9 @@ export default function Login({ onSwitchToRegister }) {
 
     // Step 2: Sign challenge with private key (done locally)
     const signature = await signMessage(privateKey.trim(), challenge)
-    // Use Unix timestamp (seconds), not ISO string
     const timestamp = Math.floor(Date.now() / 1000)
 
-    console.log('Step 3: Sending signed challenge to backend...', {
-      username,
-      challenge: challenge.substring(0, 30) + '...',
-      signatureLength: signature.length,
-      timestamp
-    })
+    console.log('Step 3: Sending signed challenge to backend...')
 
     // Step 3: Verify challenge (send signature to backend)
     const verifyResponse = await verifyChallenge({
@@ -144,21 +138,21 @@ export default function Login({ onSwitchToRegister }) {
     })
 
     console.log('Step 4: Backend verified signature, received JWT')
-    console.log('=== LOGIN SUCCESS ===')
 
-    // Step 4: Save token and user data
+    // Step 4: Save token and user data to AuthContext
     const { token, user } = verifyResponse
     login(token, user)
+
+    console.log('Step 5: Token saved, auth state updated')
+    console.log('=== LOGIN SUCCESS ===')
 
     setAlert({
       type: 'success',
       message: '🎉 Login successful! Redirecting to dashboard...'
     })
 
-    // Redirect after brief delay
-    setTimeout(() => {
-      // Dashboard will render automatically due to auth state change
-    }, 1000)
+    // IMPORTANT: Don't need to redirect manually - App.jsx will detect isAuthenticated change
+    // The component tree will re-render and show Dashboard instead of Login
 
   } catch (err) {
     console.error('Login error:', err)

@@ -3,6 +3,7 @@ import { AuthProvider } from './components/Auth/AuthContext'
 import { useAuth } from './hooks/useAuth'
 import Register from './components/Auth/Register'
 import Login from './components/Auth/Login'
+import Dashboard from './components/Dashboard/Dashboard'
 import './App.css'
 
 /**
@@ -11,7 +12,6 @@ import './App.css'
  */
 function AppContent() {
   const { isAuthenticated, loading } = useAuth()
-  // Track which auth screen to show
   const [authMode, setAuthMode] = useState('login') // 'login' | 'register'
 
   if (loading) {
@@ -23,31 +23,30 @@ function AppContent() {
     )
   }
 
+  // User is authenticated - show Dashboard
+  if (isAuthenticated) {
+    return <Dashboard />
+  }
+
   // Not authenticated - show Login or Register
-  if (!isAuthenticated) {
-    return authMode === 'register' ? (
+  if (authMode === 'register') {
+    return (
       <Register
         onSwitchToLogin={() => setAuthMode('login')}
-      />
-    ) : (
-      <Login
-        onSwitchToRegister={() => setAuthMode('register')}
       />
     )
   }
 
-  // Authenticated - show Dashboard placeholder
   return (
-    <div className="dashboard-placeholder">
-      <h1>🎉 Welcome to FastEx!</h1>
-      <p>Dashboard coming soon...</p>
-    </div>
+    <Login
+      onSwitchToRegister={() => setAuthMode('register')}
+    />
   )
 }
 
 /**
  * App - Root component
- * Wraps everything in AuthProvider to provide global auth state
+ * Wraps everything in AuthProvider
  */
 export default function App() {
   return (

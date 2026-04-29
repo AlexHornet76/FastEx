@@ -140,8 +140,24 @@ func main() {
 	mux.HandleFunc("GET /market/ticker/{instrument}", marketProxy.GetTicker)
 	mux.HandleFunc("GET /market/candles/{instrument}", marketProxy.GetCandles)
 
-	// Settlement proxy
-	mux.Handle("GET /trades", auth.JWTMiddleware(cfg.JWTSecret)(
+	// Public instruments (from database)
+	mux.HandleFunc("GET /instruments", handlers.GetInstruments(db))
+	mux.HandleFunc("GET /instruments/{symbol}", handlers.GetInstrument(db))
+
+	// Settlement proxy endpoints
+	mux.Handle("GET /account/balance", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(settlementProxy.GetBalance),
+	))
+
+	mux.Handle("GET /account/holdings", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(settlementProxy.GetHoldings),
+	))
+
+	mux.Handle("GET /account/ledger", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(settlementProxy.GetLedger),
+	))
+
+	mux.Handle("GET /account/trades", auth.JWTMiddleware(cfg.JWTSecret)(
 		http.HandlerFunc(settlementProxy.GetTrades),
 	))
 
@@ -160,7 +176,7 @@ func main() {
 	mux.Handle("DELETE /api/orders/{id}", auth.JWTMiddleware(cfg.JWTSecret)(
 		http.HandlerFunc(orderHandler.CancelOrder),
 	))
-	mux.Handle("GET /api/orderbook/{instrument}", auth.JWTMiddleware(cfg.JWTSecret)(
+	mux.Handle("GET /orderbook/{instrument}", auth.JWTMiddleware(cfg.JWTSecret)(
 		http.HandlerFunc(orderHandler.GetOrderBook),
 	))
 
