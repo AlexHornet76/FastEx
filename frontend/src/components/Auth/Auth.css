@@ -1,0 +1,517 @@
+@import '../../styles/colors.css';
+
+/* ========== CONTAINER ========== */
+.auth-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-primary);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Animated background gradient - subtle floating effect */
+.auth-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(41, 98, 255, 0.1) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 6s ease-in-out infinite;
+}
+
+.auth-container::after {
+  content: '';
+  position: absolute;
+  bottom: -50%;
+  left: -50%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(38, 166, 154, 0.1) 0%, transparent 70%);
+  border-radius: 50%;
+  animation: float 8s ease-in-out infinite reverse;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(30px, 30px);
+  }
+}
+
+/* ========== CARD ========== */
+.auth-card {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-lg);
+  padding: 40px;
+  width: 100%;
+  max-width: 450px;
+  animation: slideUp 0.5s ease-out;
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========== HEADER ========== */
+.auth-header {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.auth-header h1 {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.auth-subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* ========== FORM GROUPS ========== */
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+
+/* Help text for form fields */
+.form-help-text {
+  margin: 6px 0 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* ========== INPUTS ========== */
+.form-group input,
+.form-group textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+  letter-spacing: 0.3px;
+}
+
+/* Input placeholder text */
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Input focus state - blue accent */
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: var(--bg-tertiary);
+  box-shadow: 0 0 0 3px rgba(41, 98, 255, 0.15);
+}
+
+/* Input hover state */
+.form-group input:hover:not(:focus),
+.form-group textarea:hover:not(:focus) {
+  border-color: var(--border-light);
+}
+
+/* Textarea specific styling */
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* ========== KEY DISPLAY ========== */
+.key-display {
+  padding: 15px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
+/* Key generation status - green checkmark */
+.key-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 15px;
+  color: var(--success);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* Animated status icon */
+.status-icon {
+  font-size: 18px;
+  animation: scaleIn 0.3s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Public key preview section */
+.key-preview {
+  margin-bottom: 15px;
+}
+
+.key-preview label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.key-preview textarea {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.key-preview textarea:focus {
+  box-shadow: 0 0 0 3px rgba(41, 98, 255, 0.15);
+}
+
+/* ========== BUTTONS ========== */
+.btn {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  font-size: 13px;
+}
+
+/* Disabled button state */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Primary Button - Blue gradient with shadow */
+.btn-primary {
+  background: var(--gradient-accent);
+  color: white;
+  border: 1px solid var(--accent-primary);
+  box-shadow: 0 4px 12px rgba(41, 98, 255, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent-active) 100%);
+  box-shadow: 0 6px 20px rgba(41, 98, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(41, 98, 255, 0.2);
+}
+
+/* Secondary Button - Dark gray with border */
+.btn-secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--border-light);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.btn-secondary:active:not(:disabled) {
+  background: var(--border-color);
+}
+
+.full-width {
+  width: 100%;
+}
+
+/* ========== WARNING BOX ========== */
+.warning-box {
+  margin-top: 20px;
+  padding: 12px;
+  background: rgba(255, 167, 38, 0.1);
+  border: 1px solid var(--warning);
+  border-left: 3px solid var(--warning);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--warning);
+  line-height: 1.5;
+}
+
+.warning-box strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.warning-box ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.warning-box li {
+  margin: 4px 0;
+}
+
+/* ========== FOOTER ========== */
+.auth-footer {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.auth-footer p {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* Link button for switching between pages */
+.link-button {
+  background: none;
+  border: none;
+  color: var(--accent-primary);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.link-button:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 25px;
+    border-radius: 8px;
+  }
+
+  .auth-header h1 {
+    font-size: 24px;
+  }
+
+  .auth-subtitle {
+    font-size: 12px;
+  }
+
+  .btn {
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+
+  .form-group label {
+    font-size: 13px;
+  }
+
+  .form-help-text {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .auth-card {
+    padding: 20px;
+  }
+
+  .auth-header h1 {
+    font-size: 22px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+}
+
+/* ========== LOGIN SPECIFIC STYLES ========== */
+
+/* Private key input section */
+.key-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+/* Private key textarea */
+.private-key-textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+  letter-spacing: 0.3px;
+  resize: vertical;
+  min-height: 100px;
+}
+
+.private-key-textarea::placeholder {
+  color: var(--text-tertiary);
+}
+
+.private-key-textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: var(--bg-tertiary);
+  box-shadow: 0 0 0 3px rgba(41, 98, 255, 0.15);
+}
+
+.private-key-textarea:hover:not(:focus) {
+  border-color: var(--border-light);
+}
+
+/* File upload section */
+.file-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border: 1px dashed var(--border-light);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.file-upload-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.file-upload-label:hover {
+  color: var(--accent-primary);
+}
+
+/* File input styling */
+.file-input {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  padding: 4px;
+}
+
+.file-input::file-selector-button {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  padding: 6px 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  margin-right: 8px;
+}
+
+.file-input::file-selector-button:hover {
+  background: var(--border-light);
+  border-color: var(--accent-primary);
+}
+
+/* Loading state indicator */
+.login-step-indicator {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.login-step-indicator.signing {
+  color: var(--accent-primary);
+  font-weight: 500;
+}
+
+/* ========== RESPONSIVE LOGIN STYLES ========== */
+
+@media (max-width: 480px) {
+  .private-key-textarea {
+    font-size: 11px;
+    min-height: 80px;
+  }
+
+  .file-upload-section {
+    padding: 10px;
+  }
+
+  .file-input::file-selector-button {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}

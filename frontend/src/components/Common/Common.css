@@ -1,0 +1,126 @@
+/* ========== ALERT COMPONENT ========== */
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  animation: slideIn 0.3s ease-in;
+  border-left: 4px solid;
+  background: var(--bg-secondary);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Success Alert - Green color */
+.alert-success {
+  border-left-color: var(--success);
+  background: rgba(38, 166, 154, 0.1);
+  color: var(--profit-light);
+}
+
+.alert-success .alert-close {
+  color: var(--success);
+}
+
+/* Error Alert - Red color */
+.alert-error {
+  border-left-color: var(--error);
+  background: rgba(239, 83, 80, 0.1);
+  color: var(--loss-light);
+}
+
+.alert-error .alert-close {
+  color: var(--error);
+}
+
+/* Info Alert - Blue color */
+.alert-info {
+  border-left-color: var(--info);
+  background: rgba(41, 182, 246, 0.1);
+  color: var(--info);
+}
+
+.alert-info .alert-close {
+  color: var(--info);
+}
+
+.alert-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+}
+
+/* Download link styling */
+.download-link {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.download-link:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Close button */
+.alert-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  opacity: 0.7;
+}
+
+.alert-close:hover {
+  opacity: 1;
+}
+
+/* ========== SPINNER COMPONENT ========== */
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--border-light);
+  border-radius: 50%;
+  border-top-color: var(--accent-primary);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Light spinner variant */
+.spinner.light {
+  border-color: rgba(255, 255, 255, 0.2);
+  border-top-color: white;
+}

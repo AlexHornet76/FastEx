@@ -1,0 +1,48 @@
+:root {
+  /* === BACKGROUNDS === */
+  --bg-primary: #0e1117;      /* Primary background - almost black */
+  --bg-secondary: #1a1f2b;    /* Cards and panels */
+  --bg-tertiary: #24292f;     /* Hover states */
+  
+  /* === TEXT === */
+  --text-primary: #e0e0e0;    /* Primary text - light white */
+  --text-secondary: #9e9e9e;  /* Secondary text - gray */
+  --text-tertiary: #6e6e6e;   /* Very light text */
+  
+  /* === BORDERS & DIVIDERS === */
+  --border-color: #2a2a2a;    /* Border color - dark gray */
+  --border-light: #3a3a3a;    /* Light borders */
+  
+  /* === ACCENT COLORS === */
+  --accent-primary: #2962ff;  /* Blue - trust, primary buttons */
+  --accent-hover: #1e53d8;    /* Blue hover - darker */
+  --accent-active: #1845c0;   /* Blue active */
+  
+  /* === TRADING COLORS === */
+  --profit-green: #26a69a;    /* Green - profit, growth */
+  --profit-light: #4db6a8;    /* Green more open */
+  --loss-red: #ef5350;        /* Red - loss, decline */
+  --loss-light: #ff6f6f;      /* Red more open */
+  
+  /* === STATUS COLORS === */
+  --success: #26a69a;         /* Green - success */
+  --warning: #ffa726;         /* Orange - warning */
+  --error: #ef5350;           /* Red - error */
+  --info: #29b6f6;            /* Light blue - info */
+  
+  /* === GRADIENTS === */
+  --gradient-accent: linear-gradient(135deg, #2962ff 0%, #1845c0 100%);
+  --gradient-success: linear-gradient(135deg, #26a69a 0%, #1b8580 100%);
+  --gradient-error: linear-gradient(135deg, #ef5350 0%, #d32f2f 100%);
+  
+  /* === SHADOWS === */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.7);
+  
+  /* === TRANSITIONS === */
+  --transition-fast: 0.2s ease-out;
+  --transition-normal: 0.3s ease-out;
+  --transition-slow: 0.5s ease-out;
+}
+
