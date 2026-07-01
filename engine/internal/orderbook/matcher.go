@@ -77,13 +77,13 @@ func (ob *OrderBook) MatchOrder(incomingOrder *models.Order) *MatchResult {
 
 // canMatch checks if incoming order can match at the given price
 func canMatch(incomingOrder *models.Order, restingPrice int64) bool {
-	if incomingOrder.Side == models.Buy {
-		// Buy order: can match if willing to pay >= resting sell price
-		return incomingOrder.Price >= restingPrice
-	} else {
-		// Sell order: can match if willing to sell <= resting buy price
-		return incomingOrder.Price <= restingPrice
+	if incomingOrder.Type == models.Market {
+		return true // market orders accept any available price
 	}
+	if incomingOrder.Side == models.Buy {
+		return incomingOrder.Price >= restingPrice
+	}
+	return incomingOrder.Price <= restingPrice
 }
 
 // matchAtPriceLevel matches the incoming order against orders at a specific price level

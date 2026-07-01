@@ -11,8 +11,10 @@ type Ticker struct {
 	LastQty    int64     `json:"last_qty"`
 	LastTrade  time.Time `json:"last_trade"`
 
-	TradeCount int64 `json:"trade_count"`
-	Volume     int64 `json:"volume"`
+	TradeCount int64   `json:"trade_count"`
+	Volume     int64   `json:"volume"`
+	OpenPrice  int64   `json:"open_price"`  // price of the first trade ever seen
+	ChangePct  float64 `json:"change_pct"`  // (last - open) / open * 100
 }
 
 type Store struct {
@@ -24,7 +26,7 @@ type Store struct {
 func NewStore() *Store {
 	return &Store{
 		tickers: make(map[string]*Ticker),
-		candles: NewCandleStore(10), // keep last 10 candles per instrument for demo
+		candles: NewCandleStore(500),
 	}
 }
 
@@ -38,11 +40,17 @@ func (s *Store) ApplyTrade(instrument string, price, qty int64, t time.Time) {
 		s.tickers[instrument] = x
 	}
 
+	if x.TradeCount == 0 {
+		x.OpenPrice = price
+	}
 	x.LastPrice = price
 	x.LastQty = qty
 	x.LastTrade = t
 	x.TradeCount++
 	x.Volume += qty
+	if x.OpenPrice > 0 {
+		x.ChangePct = float64(price-x.OpenPrice) / float64(x.OpenPrice) * 100.0
+	}
 	s.candles.ApplyTrade(instrument, qty, price, t)
 }
 

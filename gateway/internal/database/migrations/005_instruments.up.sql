@@ -22,4 +22,4 @@ VALUES
     ('TSLA', 'Tesla', 'TSLA', 'USD', 2, 4)
 ON CONFLICT (symbol) DO NOTHING;
 
-CREATE INDEX idx_instruments_symbol ON instruments(symbol);
+CREATE INDEX IF NOT EXISTS idx_instruments_symbol ON instruments(symbol);

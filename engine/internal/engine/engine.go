@@ -182,12 +182,21 @@ func (e *Engine) ProcessOrder(order *models.Order) (*orderbook.MatchResult, erro
 	}
 	// Step 4: Add remaining to book (if any)
 	if !result.FullyFilled && result.RemainingQty > 0 {
-		order.Status = models.Open
-		if order.FilledQty > 0 {
-			order.Status = models.Partial
-		}
-		if err := e.orderbook.AddOrder(order); err != nil {
-			return nil, fmt.Errorf("add order to book: %w", err)
+		if order.Type == models.Market {
+			// Market orders are IOC: unfilled portion is discarded, never rests in book
+			if order.FilledQty > 0 {
+				order.Status = models.Partial
+			} else {
+				order.Status = models.Rejected
+			}
+		} else {
+			order.Status = models.Open
+			if order.FilledQty > 0 {
+				order.Status = models.Partial
+			}
+			if err := e.orderbook.AddOrder(order); err != nil {
+				return nil, fmt.Errorf("add order to book: %w", err)
+			}
 		}
 	} else {
 		order.Status = models.Filled

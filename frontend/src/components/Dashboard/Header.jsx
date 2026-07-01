@@ -2,30 +2,26 @@ import { useEffect, useState } from 'react'
 import { getBalance } from '../../services/trading'
 import './Dashboard.css'
 
-/**
- * Header Component
- * Shows user info, balance, and navigation buttons
- */
+// Raw balance unit → display dollars
+const RAW_DIVISOR = 10_000
+
 export default function Header({ user, balance, onViewHoldings, onLogout }) {
-  const [loading, setLoading] = useState(true)
-  const [balanceData, setBalanceData] = useState(0)
+  const [displayBalance, setDisplayBalance] = useState(0)
 
   useEffect(() => {
     const fetchBalance = async () => {
       try {
         const data = await getBalance()
-        setBalanceData(data.usd_balance || 0)
+        setDisplayBalance((parseFloat(data.balance) || 0) / RAW_DIVISOR)
       } catch (err) {
         console.error('Failed to fetch balance:', err)
       }
-      setLoading(false)
     }
 
     fetchBalance()
-    // Refresh balance every 30 seconds
-    const interval = setInterval(fetchBalance, 30000)
+    const interval = setInterval(fetchBalance, 3000)
     return () => clearInterval(interval)
-  }, [])
+  }, [balance])
 
   return (
     <header className="dashboard-header">
@@ -36,29 +32,18 @@ export default function Header({ user, balance, onViewHoldings, onLogout }) {
       <div className="header-center">
         <div className="balance-display">
           <span className="balance-label">USD Balance</span>
-          <span className="balance-amount">
-            ${balanceData.toFixed(2)}
-          </span>
+          <span className="balance-amount">${displayBalance.toFixed(2)}</span>
         </div>
       </div>
 
       <div className="header-right">
-        <button 
-          onClick={onViewHoldings}
-          className="btn-secondary"
-          title="View your holdings"
-        >
-          💼 My Holdings
+        <button onClick={onViewHoldings} className="btn-secondary" title="View your holdings">
+          💼 My Portfolio
         </button>
-        
-        <span className="user-info">
-          {user?.username}
-        </span>
 
-        <button 
-          onClick={onLogout}
-          className="btn-logout"
-        >
+        <span className="user-info">{user?.username}</span>
+
+        <button onClick={onLogout} className="btn-logout">
           🔓 Logout
         </button>
       </div>

@@ -25,7 +25,9 @@ func (s *Server) Router() http.Handler {
 	accountAPI := NewAccountAPI(s.db)
 	mux.HandleFunc("GET /balance", accountAPI.GetBalance)
 	mux.HandleFunc("GET /holdings", accountAPI.GetHoldings)
+	mux.HandleFunc("GET /cost-basis", accountAPI.GetCostBasis)
 	mux.HandleFunc("GET /ledger", accountAPI.GetLedger)
+	mux.HandleFunc("POST /deposit", accountAPI.Deposit)
 	return mux
 }
 

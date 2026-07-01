@@ -1,10 +1,5 @@
 import api from './api'
 
-/**
- * Get all available trading instruments
- * 
- * @returns {Promise<Array>} List of instruments with current prices
- */
 export async function getInstruments() {
   try {
     const response = await api.get('/instruments')
@@ -14,12 +9,6 @@ export async function getInstruments() {
   }
 }
 
-/**
- * Get order book for an instrument
- * 
- * @param {string} symbol - Instrument symbol (BTC, AAPL, etc)
- * @returns {Promise<Object>} Order book with bids and asks
- */
 export async function getOrderbook(symbol) {
   try {
     const response = await api.get(`/orderbook/${symbol}`)
@@ -29,11 +18,6 @@ export async function getOrderbook(symbol) {
   }
 }
 
-/**
- * Get user's balance
- * 
- * @returns {Promise<Object>} User's USD balance
- */
 export async function getBalance() {
   try {
     const response = await api.get('/account/balance')
@@ -44,30 +28,23 @@ export async function getBalance() {
 }
 
 /**
- * Place a new order
- * 
- * @param {Object} order - Order details
- * @param {string} order.instrument - Instrument symbol
- * @param {string} order.side - BUY or SELL
- * @param {number} order.quantity - Quantity to buy/sell
- * @param {number} order.price - Limit price
- * @param {string} order.order_type - limit or market
- * @returns {Promise<Object>} Placed order details
+ * Place a new order.
+ * @param {Object} order
+ * @param {string} order.instrument - e.g. "BTC"
+ * @param {string} order.side       - "BUY" or "SELL"
+ * @param {string} order.type       - "LIMIT" or "MARKET"
+ * @param {number} order.price      - int64 cents (already converted by caller)
+ * @param {number} order.quantity   - int64 100ths-precision (already converted by caller)
  */
 export async function placeOrder(order) {
   try {
-    const response = await api.post('/orders', order)
+    const response = await api.post('/api/orders', order)
     return response.data
   } catch (error) {
     throw new Error('Failed to place order: ' + error.message)
   }
 }
 
-/**
- * Get user's holdings
- * 
- * @returns {Promise<Array>} User's owned instruments with details
- */
 export async function getHoldings() {
   try {
     const response = await api.get('/account/holdings')
@@ -77,17 +54,34 @@ export async function getHoldings() {
   }
 }
 
-/**
- * Cancel an order
- * 
- * @param {string} orderId - Order ID to cancel
- * @returns {Promise<Object>} Cancellation result
- */
+export async function getCostBasis() {
+  try {
+    const response = await api.get('/account/cost-basis')
+    const items = response.data?.cost_basis ?? []
+    // avg_raw_price is in cents → divide by 100 for display dollars
+    return Object.fromEntries(
+      items.map(item => [item.asset, parseFloat(item.avg_raw_price) / 100])
+    )
+  } catch (error) {
+    return {}
+  }
+}
+
 export async function cancelOrder(orderId) {
   try {
     const response = await api.delete(`/orders/${orderId}`)
     return response.data
   } catch (error) {
     throw new Error('Failed to cancel order: ' + error.message)
+  }
+}
+
+// Funds the demo account with $100,000 USD + instrument balances.
+export async function deposit() {
+  try {
+    const response = await api.post('/account/deposit')
+    return response.data
+  } catch (error) {
+    throw new Error('Failed to deposit: ' + error.message)
   }
 }

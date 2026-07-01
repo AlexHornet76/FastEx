@@ -44,25 +44,41 @@ func Connect(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 }
 
 // RunMigrations applies all embedded *.up.sql files in lexicographic order.
-// Each file is executed in its own transaction so a failure rolls back only
-// that migration and surfaces a clear error.
+// Applied migrations are tracked in schema_migrations so restarts are safe.
 func RunMigrations(ctx context.Context, db *pgxpool.Pool) error {
+	if _, err := db.Exec(ctx, `
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			filename   TEXT        PRIMARY KEY,
+			applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		)`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+
 	entries, err := fs.Glob(migrationFiles, "migrations/*.up.sql")
 	if err != nil {
 		return fmt.Errorf("glob migration files: %w", err)
 	}
 
-	// Guarantee deterministic order (001 → 002 → …)
 	sort.Strings(entries)
 
 	for _, path := range entries {
 		name := path[len("migrations/"):]
 
+		var already bool
+		if err := db.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE filename = $1)`, name,
+		).Scan(&already); err != nil {
+			return fmt.Errorf("check migration %s: %w", name, err)
+		}
+		if already {
+			slog.Debug("migration already applied, skipping", "file", name)
+			continue
+		}
+
 		sqlBytes, err := migrationFiles.ReadFile(path)
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", name, err)
 		}
-
 		sql := strings.TrimSpace(string(sqlBytes))
 		if sql == "" {
 			continue
@@ -77,7 +93,12 @@ func RunMigrations(ctx context.Context, db *pgxpool.Pool) error {
 			_ = tx.Rollback(ctx)
 			return fmt.Errorf("execute migration %s: %w", name, err)
 		}
-
+		if _, err := tx.Exec(ctx,
+			`INSERT INTO schema_migrations(filename) VALUES($1)`, name,
+		); err != nil {
+			_ = tx.Rollback(ctx)
+			return fmt.Errorf("record migration %s: %w", name, err)
+		}
 		if err := tx.Commit(ctx); err != nil {
 			return fmt.Errorf("commit migration %s: %w", name, err)
 		}

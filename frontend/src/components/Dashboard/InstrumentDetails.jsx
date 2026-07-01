@@ -1,61 +1,89 @@
 import { useState, useEffect } from 'react'
-import { getBalance, placeOrder } from '../../services/trading'
-import OrderBook from './OrderBook'
+import { getBalance, placeOrder, deposit } from '../../services/trading'
+import { getMarketData } from '../../services/marketdata'
+import OrderBook from './Orderbook'
 import Chart from './Chart'
 import Alert from '../Common/Alert'
 import Spinner from '../Common/Spinner'
 import './Dashboard.css'
 
-/**
- * InstrumentDetail Component
- * 
- * Shows:
- * - Candlestick chart (OHLCV)
- * - Order book (bids/asks)
- * - Place order form (BUY/SELL)
- * - Order confirmation
- */
+// Raw balance unit → display dollars: usdValue = price_cents * qty_100ths = dollars * 10,000
+const RAW_DIVISOR = 10_000
+
 export default function InstrumentDetail({ instrument, onBack, balance, onBalanceUpdate }) {
-  const [side, setSide] = useState('BUY') // BUY or SELL
+  const [side, setSide] = useState('BUY')
   const [quantity, setQuantity] = useState('')
   const [price, setPrice] = useState('')
-  const [orderType, setOrderType] = useState('limit') // limit or market
-  
+  const [orderType, setOrderType] = useState('limit')
+
   const [loading, setLoading] = useState(false)
+  const [depositLoading, setDepositLoading] = useState(false)
   const [alert, setAlert] = useState(null)
   const [userBalance, setUserBalance] = useState(balance)
+  const [livePrice, setLivePrice] = useState(instrument.current_price ?? 0)
 
-  /**
-   * Fetch user's current balance
-   */
+  // Poll live price every 2 s so header + market button always reflect current price
   useEffect(() => {
-    const fetchBalance = async () => {
-      try {
-        const data = await getBalance()
-        setUserBalance(data.usd_balance || 0)
-        onBalanceUpdate(data.usd_balance || 0)
-      } catch (err) {
-        console.error('Failed to fetch balance:', err)
-      }
+    let cancelled = false
+    const poll = async () => {
+      const mkt = await getMarketData(instrument.symbol).catch(() => null)
+      if (!cancelled && mkt && mkt.current_price > 0) setLivePrice(mkt.current_price)
     }
+    poll()
+    const iv = setInterval(poll, 2000)
+    return () => { cancelled = true; clearInterval(iv) }
+  }, [instrument.symbol])
 
-    fetchBalance()
-  }, [onBalanceUpdate])
+  const refreshBalance = async () => {
+    try {
+      const data = await getBalance()
+      const display = (parseFloat(data.balance) || 0) / RAW_DIVISOR
+      setUserBalance(display)
+      onBalanceUpdate(display)
+    } catch (err) {
+      console.error('Failed to fetch balance:', err)
+    }
+  }
 
-  /**
-   * Handle order placement
-   */
+  useEffect(() => {
+    refreshBalance()
+  }, []) // eslint-disable-line
+
+  const handleDeposit = async () => {
+    setDepositLoading(true)
+    setAlert(null)
+    try {
+      await deposit()
+      setAlert({ type: 'success', message: 'Demo account funded: +$100,000 USD added to your balance.' })
+      await refreshBalance()
+    } catch (err) {
+      setAlert({ type: 'error', message: 'Deposit failed: ' + err.message })
+    }
+    setDepositLoading(false)
+  }
+
   const handlePlaceOrder = async (e) => {
     e.preventDefault()
 
-    // Validate inputs
-    if (!quantity || parseFloat(quantity) <= 0) {
+    const qty = parseFloat(quantity)
+    const limitPrice = parseFloat(price) || livePrice
+
+    if (!qty || qty <= 0) {
       setAlert({ type: 'error', message: 'Invalid quantity' })
       return
     }
-
-    if (orderType === 'limit' && (!price || parseFloat(price) <= 0)) {
+    if (orderType === 'limit' && (!price || limitPrice <= 0)) {
       setAlert({ type: 'error', message: 'Invalid price' })
+      return
+    }
+
+    // Balance check in display dollars
+    const totalCost = qty * limitPrice
+    if (side === 'BUY' && totalCost > userBalance) {
+      setAlert({
+        type: 'error',
+        message: `Insufficient balance. Need $${totalCost.toFixed(2)}, have $${userBalance.toFixed(2)}`,
+      })
       return
     }
 
@@ -63,149 +91,123 @@ export default function InstrumentDetail({ instrument, onBack, balance, onBalanc
     setAlert(null)
 
     try {
-      // Calculate total cost
-      const qty = parseFloat(quantity)
-      const limitPrice = parseFloat(price) || instrument.current_price
-      const totalCost = qty * limitPrice
-
-      // Check balance for BUY orders
-      if (side === 'BUY' && totalCost > userBalance) {
-        setAlert({
-          type: 'error',
-          message: `Insufficient balance. Need $${totalCost.toFixed(2)}, have $${userBalance.toFixed(2)}`
-        })
-        setLoading(false)
-        return
-      }
-
-      // Place order
+      // Convert to engine int64 units:
+      //   price  → cents         (× 100)
+      //   qty    → 100ths units  (× 100)
       const result = await placeOrder({
         instrument: instrument.symbol,
         side,
-        quantity: qty,
-        price: limitPrice,
-        order_type: orderType
+        type: orderType.toUpperCase(),
+        price: Math.round(limitPrice * 100),
+        quantity: Math.round(qty * 100),
       })
 
-      console.log('Order placed:', result)
+      if (result.status === 'REJECTED') {
+        setAlert({
+          type: 'error',
+          message: `Order rejected — no ${side === 'BUY' ? 'sell' : 'buy'} orders in the book. Try a limit order or run the seeder.`,
+        })
+      } else if (result.status === 'PARTIAL') {
+        const filled = (result.filled_qty / 100).toFixed(4)
+        setAlert({
+          type: 'info',
+          message: `Partially filled: ${filled} of ${qty.toFixed(2)} ${instrument.symbol} — insufficient book depth for the rest.`,
+        })
+      } else {
+        setAlert({
+          type: 'success',
+          message: `Order filled: ${side} ${qty.toFixed(2)} ${instrument.symbol} @ $${limitPrice.toFixed(2)}`,
+        })
+      }
 
-      setAlert({
-        type: 'success',
-        message: `✓ Order placed: ${side} ${qty} ${instrument.symbol} @ $${limitPrice.toFixed(2)}`
-      })
-
-      // Reset form
       setQuantity('')
       setPrice('')
-
-      // Refresh balance
-      const data = await getBalance()
-      setUserBalance(data.usd_balance || 0)
-      onBalanceUpdate(data.usd_balance || 0)
-
+      await refreshBalance()
     } catch (err) {
-      console.error('Order placement error:', err)
-      setAlert({
-        type: 'error',
-        message: 'Failed to place order: ' + err.message
-      })
+      console.error('Order error:', err)
+      setAlert({ type: 'error', message: 'Failed to place order: ' + err.message })
     }
 
     setLoading(false)
   }
 
-  /**
-   * Auto-fill price with current market price
-   */
   const handleMarketPrice = () => {
-    setPrice(instrument.current_price.toFixed(2))
+    setPrice(livePrice.toFixed(2))
   }
 
   return (
     <div className="instrument-detail">
-      {/* Header with back button */}
       <div className="detail-header">
-        <button onClick={onBack} className="btn-back">
-          ← Back to Instruments
-        </button>
-        <h2>
-          {instrument.symbol} - {instrument.name}
-        </h2>
+        <button onClick={onBack} className="btn-back">← Back</button>
+        <h2>{instrument.symbol} — {instrument.name}</h2>
         <span className="current-price">
-          ${instrument.current_price.toFixed(2)}
+          ${livePrice.toFixed(2)}
         </span>
       </div>
 
-      {/* Alerts */}
-      {alert && (
-        <Alert {...alert} onClose={() => setAlert(null)} />
-      )}
+      {alert && <Alert {...alert} onClose={() => setAlert(null)} />}
 
       <div className="detail-container">
-        {/* Left side: Chart and order book */}
         <div className="detail-left">
-          {/* Chart */}
           <div className="chart-container">
             <Chart instrument={instrument} />
           </div>
 
-          {/* Order book */}
-          <div className="orderbook-container">
+          <div className="orderbook-wrapper">
             <OrderBook instrument={instrument} />
           </div>
         </div>
 
-        {/* Right side: Order form */}
         <div className="detail-right">
           <div className="order-panel">
-            <h3>Place Order</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3>Place Order</h3>
+              <button
+                className="btn-secondary"
+                style={{ fontSize: 11, padding: '4px 10px' }}
+                onClick={handleDeposit}
+                disabled={depositLoading}
+                title="Add $100,000 demo USD + instrument balances"
+              >
+                {depositLoading ? 'Funding...' : '💰 Fund Demo'}
+              </button>
+            </div>
 
-            {/* Side selector (BUY/SELL) */}
             <div className="side-selector">
               <button
                 className={`side-btn buy ${side === 'BUY' ? 'active' : ''}`}
                 onClick={() => setSide('BUY')}
               >
-                🟢 BUY
+                BUY
               </button>
               <button
                 className={`side-btn sell ${side === 'SELL' ? 'active' : ''}`}
                 onClick={() => setSide('SELL')}
               >
-                🔴 SELL
+                SELL
               </button>
             </div>
 
-            {/* Order type selector */}
             <div className="order-type">
               <label>
-                <input
-                  type="radio"
-                  value="limit"
-                  checked={orderType === 'limit'}
-                  onChange={(e) => setOrderType(e.target.value)}
-                />
-                Limit Order
+                <input type="radio" value="limit" checked={orderType === 'limit'}
+                  onChange={(e) => setOrderType(e.target.value)} />
+                Limit
               </label>
               <label>
-                <input
-                  type="radio"
-                  value="market"
-                  checked={orderType === 'market'}
-                  onChange={(e) => setOrderType(e.target.value)}
-                />
-                Market Order
+                <input type="radio" value="market" checked={orderType === 'market'}
+                  onChange={(e) => setOrderType(e.target.value)} />
+                Market
               </label>
             </div>
 
-            {/* Order form */}
             <form onSubmit={handlePlaceOrder}>
-              {/* Quantity */}
               <div className="form-group">
                 <label>Quantity ({instrument.symbol})</label>
                 <input
                   type="number"
                   step="0.01"
+                  min="0.01"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   placeholder="0.00"
@@ -213,57 +215,47 @@ export default function InstrumentDetail({ instrument, onBack, balance, onBalanc
                 />
               </div>
 
-              {/* Price (only for limit orders) */}
-              {orderType === 'limit' && (
+              {orderType === 'limit' ? (
                 <div className="form-group">
                   <label>Price (USD)</label>
-                  <div className="price-input-group">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="0.00"
-                      disabled={loading}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleMarketPrice}
-                      className="btn-market"
-                      disabled={loading}
-                    >
-                      Market
-                    </button>
-                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="0.00"
+                    disabled={loading}
+                  />
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>Execution Price (live)</label>
+                  <div className="market-price-live">${livePrice.toFixed(2)}</div>
                 </div>
               )}
 
-              {/* Total cost estimation */}
-              {quantity && price && orderType === 'limit' && (
+              {quantity && (orderType === 'market' || price) && (
                 <div className="total-cost">
-                  <span>Total: ${(parseFloat(quantity) * parseFloat(price)).toFixed(2)}</span>
+                  <span>
+                    Est. Total: ${(
+                      parseFloat(quantity || 0) *
+                      (orderType === 'market' ? livePrice : parseFloat(price || 0))
+                    ).toFixed(2)}
+                  </span>
                 </div>
               )}
 
-              {/* Balance info */}
               <div className="balance-info">
-                <span className="label">Available Balance:</span>
+                <span className="label">Available USD:</span>
                 <span className="amount">${userBalance.toFixed(2)}</span>
               </div>
 
-              {/* Submit button */}
               <button
                 type="submit"
                 className={`btn-order ${side.toLowerCase()}`}
                 disabled={loading || !quantity}
               >
-                {loading ? (
-                  <>
-                    <Spinner /> Processing...
-                  </>
-                ) : (
-                  `${side} ${instrument.symbol}`
-                )}
+                {loading ? <><Spinner /> Processing...</> : `${side} ${instrument.symbol}`}
               </button>
             </form>
           </div>

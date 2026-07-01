@@ -145,12 +145,20 @@ func main() {
 	mux.HandleFunc("GET /instruments/{symbol}", handlers.GetInstrument(db))
 
 	// Settlement proxy endpoints
+	mux.Handle("POST /account/deposit", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(settlementProxy.Deposit),
+	))
+
 	mux.Handle("GET /account/balance", auth.JWTMiddleware(cfg.JWTSecret)(
 		http.HandlerFunc(settlementProxy.GetBalance),
 	))
 
 	mux.Handle("GET /account/holdings", auth.JWTMiddleware(cfg.JWTSecret)(
 		http.HandlerFunc(settlementProxy.GetHoldings),
+	))
+
+	mux.Handle("GET /account/cost-basis", auth.JWTMiddleware(cfg.JWTSecret)(
+		http.HandlerFunc(settlementProxy.GetCostBasis),
 	))
 
 	mux.Handle("GET /account/ledger", auth.JWTMiddleware(cfg.JWTSecret)(

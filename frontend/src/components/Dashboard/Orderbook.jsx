@@ -2,10 +2,6 @@ import { useEffect, useState } from 'react'
 import { getOrderbook } from '../../services/trading'
 import './Dashboard.css'
 
-/**
- * OrderBook Component
- * Shows bids (buy orders) and asks (sell orders)
- */
 export default function OrderBook({ instrument }) {
   const [orderbook, setOrderbook] = useState({ bids: [], asks: [] })
   const [loading, setLoading] = useState(true)
@@ -22,7 +18,6 @@ export default function OrderBook({ instrument }) {
     }
 
     fetchOrderbook()
-    // Refresh every 2 seconds
     const interval = setInterval(fetchOrderbook, 2000)
     return () => clearInterval(interval)
   }, [instrument])
@@ -31,42 +26,55 @@ export default function OrderBook({ instrument }) {
     return <div className="orderbook">Loading orderbook...</div>
   }
 
+  // Backend prices: int64 cents → divide by 100 for USD display
+  // Backend quantities: int64 in 100ths units → divide by 100 for display
+  const fmtPrice = (p) => (p / 100).toFixed(2)
+  const fmtQty   = (q) => (q / 100).toFixed(2)
+
   return (
     <div className="orderbook">
       <h4>Order Book</h4>
 
-      <div className="orderbook-container">
-        {/* Asks (sell orders) - red */}
+      <div className="orderbook-grid">
         <div className="orderbook-side">
           <div className="side-header sell">Asks (Sell)</div>
           <div className="orderbook-table">
             <div className="table-header">
-              <span>Price</span>
+              <span>Price ($)</span>
               <span>Size</span>
             </div>
-            {(orderbook.asks || []).slice(0, 5).map((ask, idx) => (
+            {(orderbook.asks || []).slice(0, 8).map((ask, idx) => (
               <div key={idx} className="table-row sell">
-                <span>${ask.price.toFixed(2)}</span>
-                <span>{ask.quantity.toFixed(4)}</span>
+                <span>${fmtPrice(ask.price)}</span>
+                <span>{fmtQty(ask.quantity)}</span>
               </div>
             ))}
+            {(orderbook.asks || []).length === 0 && (
+              <div className="table-row" style={{ color: 'var(--text-tertiary)', justifyContent: 'center' }}>
+                No asks
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Bids (buy orders) - green */}
         <div className="orderbook-side">
           <div className="side-header buy">Bids (Buy)</div>
           <div className="orderbook-table">
             <div className="table-header">
-              <span>Price</span>
+              <span>Price ($)</span>
               <span>Size</span>
             </div>
-            {(orderbook.bids || []).slice(0, 5).map((bid, idx) => (
+            {(orderbook.bids || []).slice(0, 8).map((bid, idx) => (
               <div key={idx} className="table-row buy">
-                <span>${bid.price.toFixed(2)}</span>
-                <span>{bid.quantity.toFixed(4)}</span>
+                <span>${fmtPrice(bid.price)}</span>
+                <span>{fmtQty(bid.quantity)}</span>
               </div>
             ))}
+            {(orderbook.bids || []).length === 0 && (
+              <div className="table-row" style={{ color: 'var(--text-tertiary)', justifyContent: 'center' }}>
+                No bids
+              </div>
+            )}
           </div>
         </div>
       </div>

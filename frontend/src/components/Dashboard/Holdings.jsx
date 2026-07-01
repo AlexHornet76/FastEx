@@ -1,117 +1,129 @@
 import { useState, useEffect } from 'react'
-import { getHoldings } from '../../services/trading'
+import { getHoldings, getBalance, getCostBasis } from '../../services/trading'
+import { getMarketData } from '../../services/marketdata'
 import './Dashboard.css'
 
-/**
- * Holdings Component
- * Shows user's owned instruments with:
- * - Quantity
- * - Average buy price
- * - Current price
- * - Profit/Loss
- */
+const RAW_DIVISOR = 10_000
+
 export default function Holdings({ onBack }) {
-  const [holdings, setHoldings] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [holdings, setHoldings]       = useState([])
+  const [usdBalance, setUsdBalance]   = useState(0)
+  const [loading, setLoading]         = useState(true)
+  const [error, setError]             = useState(null)
 
   useEffect(() => {
-    const fetchHoldings = async () => {
+    let cancelled = false
+
+    const fetchAll = async (isFirst) => {
       try {
-        setLoading(true)
-        const data = await getHoldings()
-        setHoldings(data.holdings ?? [])
+        const [holdingsData, balanceData, costBasis] = await Promise.all([
+          getHoldings(),
+          getBalance(),
+          getCostBasis(),
+        ])
+        if (cancelled) return
+
+        setUsdBalance((parseFloat(balanceData.balance) || 0) / RAW_DIVISOR)
+
+        const items = holdingsData.holdings ?? []
+        const enriched = await Promise.all(
+          items.map(async (h) => {
+            const mkt = await getMarketData(h.asset).catch(() => ({ current_price: 0 }))
+            const qty      = parseFloat(h.quantity) / 100
+            const price    = mkt.current_price || 0
+            const avgCost  = costBasis[h.asset] ?? 0
+            const pnlPct   = avgCost > 0 ? ((price - avgCost) / avgCost) * 100 : null
+            return {
+              asset: h.asset,
+              quantity: qty,
+              current_price: price,
+              avg_cost: avgCost,
+              pnl_pct: pnlPct,
+              value: qty * price,
+            }
+          })
+        )
+        if (cancelled) return
+
+        setHoldings(enriched)
         setError(null)
       } catch (err) {
-        console.error('Failed to fetch holdings:', err)
-        setError(err.message)
+        if (!cancelled) setError(err.message)
       }
-      setLoading(false)
+      if (!cancelled && isFirst) setLoading(false)
     }
 
-    fetchHoldings()
+    fetchAll(true)
+    const iv = setInterval(() => fetchAll(false), 3000)
+    return () => { cancelled = true; clearInterval(iv) }
   }, [])
 
-  const totalValue = holdings.reduce((sum, h) => sum + (h.current_price * h.quantity), 0)
-  const totalCost = holdings.reduce((sum, h) => sum + (h.average_price * h.quantity), 0)
-  const totalPnL = totalValue - totalCost
+  const assetsValue      = holdings.reduce((sum, h) => sum + h.value, 0)
+  const totalPortfolio   = usdBalance + assetsValue
 
   return (
     <div className="holdings">
       <div className="holdings-header">
-        <button onClick={onBack} className="btn-back">
-          ← Back
-        </button>
-        <h2>My Holdings</h2>
+        <button onClick={onBack} className="btn-back">← Back</button>
+        <h2>My Portfolio</h2>
       </div>
 
-      {error && (
-        <div className="error-message">
-          Failed to load holdings: {error}
-        </div>
-      )}
+      {error && <div className="error-message">Failed to load portfolio: {error}</div>}
 
       {loading ? (
-        <div className="loading">Loading holdings...</div>
-      ) : holdings.length === 0 ? (
-        <div className="empty-state">
-          <p>You don't own any instruments yet</p>
-          <button onClick={onBack} className="btn-primary">
-            Start Trading
-          </button>
-        </div>
+        <div className="loading">Loading portfolio...</div>
       ) : (
         <div className="holdings-container">
-          {/* Summary */}
           <div className="holdings-summary">
             <div className="summary-item">
-              <span className="label">Total Value</span>
-              <span className="value">${totalValue.toFixed(2)}</span>
+              <span className="label">USD Balance</span>
+              <span className="value">${usdBalance.toFixed(2)}</span>
             </div>
             <div className="summary-item">
-              <span className="label">Total Cost</span>
-              <span className="value">${totalCost.toFixed(2)}</span>
+              <span className="label">Assets Value</span>
+              <span className="value">${assetsValue.toFixed(2)}</span>
             </div>
-            <div className={`summary-item ${totalPnL >= 0 ? 'positive' : 'negative'}`}>
-              <span className="label">Total P&L</span>
-              <span className="value">
-                {totalPnL >= 0 ? '📈' : '📉'} ${Math.abs(totalPnL).toFixed(2)}
-                ({totalCost > 0 ? ((totalPnL / totalCost) * 100).toFixed(2) : '0.00'}%)
-              </span>
+            <div className="summary-item positive">
+              <span className="label">Total Portfolio</span>
+              <span className="value">${totalPortfolio.toFixed(2)}</span>
             </div>
           </div>
 
-          {/* Holdings table */}
-          <div className="holdings-table">
-            <div className="table-header">
-              <span>Instrument</span>
-              <span>Quantity</span>
-              <span>Avg Buy Price</span>
-              <span>Current Price</span>
-              <span>Value</span>
-              <span>P&L</span>
+          {holdings.length === 0 ? (
+            <div className="empty-state">
+              <p>No instrument holdings yet.</p>
+              <button onClick={onBack} className="btn-primary">Start Trading</button>
             </div>
-
-            {holdings.map((holding) => {
-              const value = holding.current_price * holding.quantity
-              const cost = holding.average_price * holding.quantity
-              const pnl = value - cost
-              const pnlPercent = cost > 0 ? (pnl / cost) * 100 : 0
-
-              return (
-                <div key={holding.instrument} className="table-row">
-                  <span className="symbol">{holding.instrument}</span>
-                  <span>{Number(holding.quantity).toFixed(4)}</span>
-                  <span>${Number(holding.average_price).toFixed(2)}</span>
-                  <span>${Number(holding.current_price).toFixed(2)}</span>
-                  <span>${value.toFixed(2)}</span>
-                  <span className={pnl >= 0 ? 'positive' : 'negative'}>
-                    {pnl >= 0 ? '📈' : '📉'} ${Math.abs(pnl).toFixed(2)} ({pnlPercent.toFixed(2)}%)
-                  </span>
-                </div>
-              )
-            })}
-          </div>
+          ) : (
+            <div className="holdings-table">
+              <div className="table-header" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr' }}>
+                <span>Asset</span>
+                <span>Quantity</span>
+                <span>Avg Cost</span>
+                <span>Price</span>
+                <span>P&amp;L %</span>
+                <span>Value (USD)</span>
+              </div>
+              {holdings.map(h => {
+                const hasCost = h.avg_cost > 0
+                const pnlPos  = h.pnl_pct !== null && h.pnl_pct >= 0
+                return (
+                  <div key={h.asset} className="table-row" style={{ gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr' }}>
+                    <span className="symbol">{h.asset}</span>
+                    <span>{h.quantity.toFixed(4)}</span>
+                    <span>{hasCost ? `$${h.avg_cost.toFixed(2)}` : '—'}</span>
+                    <span>${h.current_price.toFixed(2)}</span>
+                    <span className={h.pnl_pct !== null ? (pnlPos ? 'positive' : 'negative') : ''}>
+                      {h.pnl_pct !== null
+                        ? `${pnlPos ? '+' : ''}${h.pnl_pct.toFixed(2)}%`
+                        : '—'}
+                    </span>
+                    <span>${h.value.toFixed(2)}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

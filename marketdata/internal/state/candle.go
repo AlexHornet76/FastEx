@@ -39,11 +39,13 @@ func NewCandleStore(limit int) *CandleStore {
 	}
 }
 
-// minuteBucket returns the UTC time truncated to the minute boundary.
-// all trades within the same minute will map to the same bucket.
+const bucketSeconds = 2
+
+// minuteBucket truncates t to the nearest 1-second boundary.
 func minuteBucket(t time.Time) time.Time {
 	t = t.UTC()
-	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), 0, 0, time.UTC)
+	sec := (t.Second() / bucketSeconds) * bucketSeconds
+	return time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), sec, 0, time.UTC)
 }
 
 func (cs *CandleStore) ApplyTrade(instrument string, qty, price int64, t time.Time) {
