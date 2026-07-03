@@ -72,7 +72,7 @@ export default function InstrumentsList({ onSelectInstrument }) {
         <div className="search-box">
           <input
             type="text"
-            placeholder="🔍 Search instruments (BTC, AAPL, etc.)"
+            placeholder="Search instruments (BTC, AAPL, etc.)"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="search-input"
@@ -102,7 +102,7 @@ export default function InstrumentsList({ onSelectInstrument }) {
                 ${(instrument.current_price || 0).toFixed(2)}
               </div>
               <div className={`card-change ${(instrument.change_24h || 0) >= 0 ? 'positive' : 'negative'}`}>
-                {(instrument.change_24h || 0) >= 0 ? '📈' : '📉'} {(instrument.change_24h || 0).toFixed(2)}%
+                {(instrument.change_24h || 0) >= 0 ? '+' : ''}{(instrument.change_24h || 0).toFixed(2)}%
               </div>
               <div className="card-hint">Click to trade →</div>
             </div>

@@ -47,7 +47,7 @@ export default function Register({ onSwitchToLogin }) {
     } catch (err) {
       setAlert({
         type: 'error',
-        message: '❌ Failed to generate key pair: ' + err.message
+        message: 'Failed to generate key pair: ' + err.message
       })
     }
     
@@ -82,7 +82,7 @@ export default function Register({ onSwitchToLogin }) {
       // Success - show download alert
       setAlert({
         type: 'success',
-        message: '🎉 Registration successful! Download your private key and keep it safe!',
+        message: 'Registration successful! Download your private key and keep it safe!',
         download: keyPair.privateKey // User can download private key
       })
       
@@ -94,7 +94,7 @@ export default function Register({ onSwitchToLogin }) {
     } catch (err) {
       setAlert({
         type: 'error',
-        message: '❌ Registration failed: ' + err.message
+        message: 'Registration failed: ' + err.message
       })
     }
     
@@ -194,7 +194,7 @@ export default function Register({ onSwitchToLogin }) {
                     <Spinner /> Generating...
                   </>
                 ) : (
-                  '🔑 Generate Key Pair'
+                  'Generate Key Pair'
                 )}
               </button>
             )}
@@ -211,13 +211,13 @@ export default function Register({ onSwitchToLogin }) {
                 <Spinner /> Registering...
               </>
             ) : (
-              '📝 Register'
+              'Register'
             )}
           </button>
 
           {/* Private Key Warning */}
           <div className="warning-box">
-            <strong>⚠️ Important:</strong>
+            <strong>Important:</strong>
             <ul>
               <li>Download your private key after registration</li>
               <li>Store it somewhere safe (password manager, hardware wallet)</li>

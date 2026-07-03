@@ -26,7 +26,7 @@ export default function Header({ user, balance, onViewHoldings, onLogout }) {
   return (
     <header className="dashboard-header">
       <div className="header-left">
-        <h1 className="logo">⚡ FastEx</h1>
+        <h1 className="logo">FastEx</h1>
       </div>
 
       <div className="header-center">
@@ -38,13 +38,13 @@ export default function Header({ user, balance, onViewHoldings, onLogout }) {
 
       <div className="header-right">
         <button onClick={onViewHoldings} className="btn-secondary" title="View your holdings">
-          💼 My Portfolio
+          My Portfolio
         </button>
 
         <span className="user-info">{user?.username}</span>
 
         <button onClick={onLogout} className="btn-logout">
-          🔓 Logout
+          Logout
         </button>
       </div>
     </header>

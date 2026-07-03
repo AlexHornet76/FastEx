@@ -29,7 +29,7 @@ export default function Alert({ type, message, onClose, download }) {
             download="private-key.txt"
             className="download-link"
           >
-            📥 Download
+            Download
           </a>
         )}
       </div>

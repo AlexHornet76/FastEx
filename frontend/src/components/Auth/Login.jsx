@@ -148,7 +148,7 @@ const handleLogin = async (e) => {
 
     setAlert({
       type: 'success',
-      message: '🎉 Login successful! Redirecting to dashboard...'
+      message: 'Login successful! Redirecting to dashboard...'
     })
 
     // IMPORTANT: Don't need to redirect manually - App.jsx will detect isAuthenticated change
@@ -206,7 +206,7 @@ const handleLogin = async (e) => {
           <div className="form-group">
             <label htmlFor="privateKey">Private Key (Ed25519 hex)</label>
             <p className="form-help-text">
-              ⚠️ Your private key will be used only to sign the challenge locally
+              Your private key will be used only to sign the challenge locally
             </p>
 
             {privateKey ? (
@@ -252,7 +252,7 @@ const handleLogin = async (e) => {
                 {/* Or file upload */}
                 <div className="file-upload-section">
                   <label htmlFor="keyFile" className="file-upload-label">
-                    📁 Or upload private key file
+                    Or upload private key file
                   </label>
                   <input
                     id="keyFile"
@@ -278,13 +278,13 @@ const handleLogin = async (e) => {
                 <Spinner /> {step === 'signing' ? 'Signing...' : 'Logging in...'}
               </>
             ) : (
-              '🔓 Login'
+              'Login'
             )}
           </button>
 
           {/* Security warning */}
           <div className="warning-box">
-            <strong>🔒 Security Note:</strong>
+            <strong>Security Note:</strong>
             <ul>
               <li>Your private key is NEVER sent to our servers</li>
               <li>We only verify the signature you create</li>

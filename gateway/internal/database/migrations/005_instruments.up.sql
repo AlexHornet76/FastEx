@@ -18,7 +18,7 @@ VALUES
     ('BTC', 'Bitcoin', 'BTC', 'USD', 2, 8),
     ('ETH', 'Ethereum', 'ETH', 'USD', 2, 8),
     ('AAPL', 'Apple Inc', 'AAPL', 'USD', 2, 4),
-    ('GOOGL', 'Google', 'GOOGL', 'USD', 2, 4),
+    ('GOOGL', 'Alphabet', 'GOOGL', 'USD', 2, 4),
     ('TSLA', 'Tesla', 'TSLA', 'USD', 2, 4)
 ON CONFLICT (symbol) DO NOTHING;
 

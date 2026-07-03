@@ -169,7 +169,7 @@ export default function InstrumentDetail({ instrument, onBack, balance, onBalanc
                 disabled={depositLoading}
                 title="Add $100,000 demo USD + instrument balances"
               >
-                {depositLoading ? 'Funding...' : '💰 Fund Demo'}
+                {depositLoading ? 'Funding...' : 'Fund Demo'}
               </button>
             </div>
 
